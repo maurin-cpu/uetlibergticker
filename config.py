@@ -1,64 +1,48 @@
 """
-Konfiguration für MeteoSwiss Wetterdaten Aggregator
+Konfiguration für FlyChat Wetterdaten-System
 """
 
-from datetime import datetime, timedelta
+import os
 
-# Wichtige Schweizer Standorte mit Koordinaten
-# Format: {"name": (latitude, longitude)}
-SWISS_LOCATIONS = {
-    "Zürich": (47.3769, 8.5417),
-    "Bern": (46.9481, 7.4474),
-    "Genf": (46.2044, 6.1432),
-    "Basel": (47.5596, 7.5886),
-    "Lausanne": (46.5197, 6.6323),
-    "Luzern": (47.0502, 8.3093),
-    "St. Gallen": (47.4245, 9.3767),
-    "Lugano": (46.0037, 8.9511),
-    "Sion": (46.2292, 7.3604),
-    "Chur": (46.8499, 9.5329),
-    "Payerne": (46.8206, 6.9361),
-    "Samedan": (46.5333, 9.8833),
-}
+# ============================================================================
+# FORECAST-KONFIGURATION
+# ============================================================================
 
-# Wichtige Schweizer Wetterstationen (für Kompatibilität)
-WEATHER_STATIONS = list(SWISS_LOCATIONS.keys())
+# Anzahl Tage für Wettervorhersage (wird in fetch_weather.py verwendet)
+# API unterstützt typischerweise bis zu 7 Tage
+FORECAST_DAYS = 2
 
-# Variablen-Mapping für MeteoSwiss
-# Diese Variablen entsprechen den verfügbaren Parametern in MeteoSwiss Open Data
-VARIABLES = {
-    "temperature": "temperature",  # Temperatur in °C
-    "wind_direction": "wind_direction",  # Windrichtung in Grad
-    "wind_speed": "wind_speed",  # Windstärke in m/s oder km/h
-    "cloud_height": "cloud_base_height",  # Höhe der Bewölkung in m
-}
+# ============================================================================
+# API-KONFIGURATION
+# ============================================================================
 
-# Anzahl Tage in die Zukunft für Wettervorhersage (API unterstützt bis zu 7 Tage)
-DEFAULT_DAYS_FORWARD = 7
+# API-Endpunkt für Wettervorhersage
+API_URL = "https://api.open-meteo.com/v1/forecast"
 
-def get_forward_date_range(days_forward=None):
-    """
-    Gibt den Datumsbereich für den Datenabruf zurück (heute bis X Tage in die Zukunft).
-    
-    Args:
-        days_forward: Anzahl Tage in die Zukunft (Standard: DEFAULT_DAYS_FORWARD)
-    
-    Returns:
-        Tuple von (start_date, end_date) als datetime Objekte
-    """
-    if days_forward is None:
-        days_forward = DEFAULT_DAYS_FORWARD
-    
-    start_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-    end_date = start_date + timedelta(days=days_forward)
-    
-    return start_date, end_date
+# Wettermodell (MeteoSwiss ICON-CH Modell)
+API_MODEL = "meteoswiss_icon_ch1"
 
-# CSV-Ausgabepfad
+# Timeout für API-Anfragen in Sekunden
+API_TIMEOUT = 30
+
+# Zeitzone für Wetterdaten
+TIMEZONE = "Europe/Zurich"
+
+# Zusätzliche API-Parameter
+FORECAST_HOURS = 24  # Zusätzlicher Parameter für bessere Datenqualität
+TEMPORAL_RESOLUTION = "hourly"  # 6-Stunden-Auflösung
+PAST_HOURS = 1  # Vergangene Stunde einbeziehen
+
+# ============================================================================
+# DATEI-PFADE
+# ============================================================================
+
+# Pfad zur CSV-Datei mit Startplätzen (wird in fetch_weather.py verwendet)
+# Die CSV-Datei sollte folgende Spalten enthalten: Name, Latitude, Longitude
+CSV_FILE_PATH = os.path.join("data", "startplaetze_schweiz.csv")
+
+# Ausgabeverzeichnis für generierte Dateien (wird in mehreren Skripten verwendet)
 OUTPUT_DIR = "data"
-OUTPUT_FILENAME = "wetterdaten.csv"
 
-def get_output_path():
-    """Gibt den vollständigen Pfad zur CSV-Ausgabedatei zurück."""
-    return f"{OUTPUT_DIR}/{OUTPUT_FILENAME}"
-
+# Name der JSON-Ausgabedatei für Wetterdaten
+WEATHER_JSON_FILENAME = "wetterdaten.json"
