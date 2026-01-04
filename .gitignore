@@ -1,19 +1,21 @@
-# Virtuelle Umgebung
-.venv/
-venv/
-env/
-ENV/
-
 # Python
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
+.venv/
+venv/
+ENV/
+env/
+
+# Umgebungsvariablen
+.env
+.env.local
+.env.*.local
 
 # Daten
-data/*.csv
-data/*.json
+data/wetterdaten.json
 
 # IDE
 .vscode/
@@ -25,6 +27,3 @@ data/*.json
 # OS
 .DS_Store
 Thumbs.db
-
-# Umgebungsvariablen
-.env

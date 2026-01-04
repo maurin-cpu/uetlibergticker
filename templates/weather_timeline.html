@@ -1,0 +1,871 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flugwetter Zeitlinie - Uetliberg</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        :root {
+            --color-primary: #6366F1;
+            --color-success: #10B981;
+            --color-warning: #F59E0B;
+            --color-danger: #EF4444;
+            --color-bg: #0F172A;
+            --color-text: #F8FAFC;
+            --color-text-light: #94A3B8;
+            --color-border: rgba(255, 255, 255, 0.1);
+            --color-card: rgba(30, 41, 59, 0.7);
+            --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.1);
+            --glass-bg: rgba(30, 41, 59, 0.8);
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--color-bg);
+            color: var(--color-text);
+            line-height: 1.6;
+            padding: 20px;
+            background-image: radial-gradient(circle at 50% 0%, #1E293B 0%, #0F172A 100%);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: var(--color-card);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .header h1 {
+            font-size: 28px;
+            font-weight: 800;
+            background: linear-gradient(to right, #818CF8, #C084FC);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 4px;
+        }
+
+        .header-subtitle {
+            color: var(--color-text-light);
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .day-selector {
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid var(--color-border);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .day-selector label {
+            font-weight: 600;
+            font-size: 14px;
+            color: var(--color-text-light);
+        }
+
+        .day-selector select {
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: 1px solid var(--color-border);
+            font-size: 14px;
+            cursor: pointer;
+            background: #1E293B;
+            color: var(--color-text);
+            transition: all 0.2s ease;
+            outline: none;
+        }
+
+        .day-selector select:hover {
+            border-color: var(--color-primary);
+            background: #334155;
+        }
+
+        .test-email-button {
+            margin-top: 16px;
+            padding: 10px 20px;
+            background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 6px rgba(99, 102, 241, 0.3);
+        }
+
+        .test-email-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(99, 102, 241, 0.4);
+        }
+
+        .test-email-button:active {
+            transform: translateY(0);
+        }
+
+        .test-email-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .test-email-message {
+            margin-top: 12px;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 13px;
+            display: none;
+        }
+
+        .test-email-message.success {
+            background: rgba(16, 185, 129, 0.2);
+            border: 1px solid rgba(16, 185, 129, 0.5);
+            color: #10B981;
+            display: block;
+        }
+
+        .test-email-message.error {
+            background: rgba(239, 68, 68, 0.2);
+            border: 1px solid rgba(239, 68, 68, 0.5);
+            color: #EF4444;
+            display: block;
+        }
+
+        .meteogram-container {
+            background: var(--color-card);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: var(--shadow-lg);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .chart-title {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .chart-title span {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--color-text-light);
+        }
+
+        .unified-chart {
+            width: 100%;
+            height: 600px;
+        }
+
+        .evaluation-section {
+            background: var(--color-card);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .evaluation-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+
+        .status-badge {
+            padding: 6px 14px;
+            border-radius: 12px;
+            font-weight: 700;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .status-flyable {
+            background: rgba(16, 185, 129, 0.2);
+            color: #34D399;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
+        .status-not-flyable {
+            background: rgba(239, 68, 68, 0.2);
+            color: #F87171;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        .conditions-badge {
+            padding: 6px 14px;
+            border-radius: 12px;
+            font-weight: 700;
+            font-size: 13px;
+        }
+
+        .rating-section {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            margin-bottom: 24px;
+            padding: 16px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 12px;
+        }
+
+        .confidence-bar {
+            height: 6px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+            overflow: hidden;
+            width: 120px;
+        }
+
+        .evaluation-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+        }
+
+        .detail-section {
+            background: rgba(255, 255, 255, 0.02);
+            padding: 16px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .detail-title {
+            font-weight: 700;
+            font-size: 14px;
+            margin-bottom: 8px;
+            color: var(--color-primary);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .detail-content {
+            font-size: 13px;
+            color: var(--color-text-light);
+            line-height: 1.6;
+        }
+
+        .tooltip {
+            position: absolute;
+            background: var(--glass-bg);
+            backdrop-filter: blur(8px);
+            border: 1px solid var(--glass-border);
+            color: white;
+            padding: 14px;
+            border-radius: 12px;
+            font-size: 12px;
+            pointer-events: none;
+            opacity: 0;
+            z-index: 1000;
+            box-shadow: var(--shadow-lg);
+            min-width: 180px;
+        }
+
+        .tooltip-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 4px;
+            gap: 12px;
+        }
+
+        .tooltip-label {
+            color: var(--color-text-light);
+            font-weight: 500;
+        }
+
+        .tooltip-value {
+            font-weight: 700;
+        }
+
+        .axis text {
+            fill: var(--color-text-light);
+            font-size: 11px;
+            font-weight: 500;
+        }
+
+        .axis path, .axis line {
+            stroke: var(--color-border);
+        }
+
+        .grid line {
+            stroke: var(--color-border);
+            stroke-opacity: 0.5;
+        }
+
+        .lane-label {
+            font-size: 12px;
+            font-weight: 700;
+            fill: var(--color-text-light);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(99, 102, 241, 0.1);
+            border-top-color: var(--color-primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 1024px) {
+            .evaluation-details {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Unified Flight Meteogram</h1>
+            <div class="header-subtitle" id="location-info">Lade Fluggebietsdaten...</div>
+            <div class="day-selector" id="day-selector" style="display: none;">
+                <label for="day-select">Zeitraum wählen</label>
+                <select id="day-select"></select>
+            </div>
+            <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--color-border);">
+                <button class="test-email-button" id="test-email-btn">
+                    📧 Test-E-Mail senden
+                </button>
+                <div class="test-email-message" id="test-email-message"></div>
+            </div>
+        </div>
+
+        <div class="meteogram-container">
+            <div class="chart-title">📊 Wetteranalyse <span>Synchronisierte Zeitachse</span></div>
+            <div id="unified-meteogram" class="unified-chart"></div>
+            <div id="loading-overlay" class="loading">
+                <div class="spinner"></div>
+                <p>Analysiere Wetterdaten...</p>
+            </div>
+        </div>
+
+        <div class="evaluation-section" id="evaluation-section" style="display: none;">
+            <div class="evaluation-header">
+                <div style="display: flex; gap: 12px; align-items: center;">
+                    <span class="status-badge" id="flyable-badge">---</span>
+                    <span class="conditions-badge" id="conditions-badge">---</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 16px;">
+                    <span id="rating-stars" style="font-size: 18px;"></span>
+                    <span style="font-weight: 700; font-size: 20px;" id="rating-value">--</span>
+                    <span style="color: var(--color-text-light); font-size: 14px;">/10</span>
+                </div>
+            </div>
+            
+            <div class="rating-section">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <span style="font-weight: 600; font-size: 13px; color: var(--color-text-light);">KI-Konfidenz</span>
+                    <div class="confidence-bar">
+                        <div class="confidence-fill" id="confidence-fill"></div>
+                    </div>
+                    <span id="confidence-value" style="font-weight: 700; font-size: 13px;">--</span>
+                </div>
+            </div>
+
+            <div class="evaluation-details">
+                <div class="detail-section">
+                    <div class="detail-title">📝 Zusammenfassung</div>
+                    <div class="detail-content" id="summary"></div>
+                </div>
+                <div class="detail-section">
+                    <div class="detail-title">💨 Wind & Böen</div>
+                    <div class="detail-content" id="wind-detail"></div>
+                </div>
+                <div class="detail-section">
+                    <div class="detail-title">☀️ Thermikpotenzial</div>
+                    <div class="detail-content" id="thermik-detail"></div>
+                </div>
+                <div class="detail-section">
+                    <div class="detail-title">⚠️ Risiken & Warnungen</div>
+                    <div class="detail-content" id="risks-detail"></div>
+                </div>
+                <div class="detail-section" style="grid-column: 1 / -1;">
+                    <div class="detail-title">💡 Piloten-Empfehlung</div>
+                    <div class="detail-content" id="recommendation" style="font-size: 14px; color: var(--color-text); font-weight: 500;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="tooltip" id="tooltip"></div>
+
+    <script>
+        // Globale Variablen
+        let weatherData = null;
+        let evaluationData = null;
+        let currentDate = null;
+        let availableDates = [];
+        const margin = { top: 40, right: 60, bottom: 40, left: 60 };
+        const tooltip = d3.select('#tooltip');
+
+        // Hilfsfunktionen
+        function formatTime(date) {
+            return d3.timeFormat('%H:%M')(date);
+        }
+
+        function getWindDirectionName(degrees) {
+            const directions = ['N', 'NNO', 'NO', 'ONO', 'O', 'OSO', 'SO', 'SSO', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
+            return directions[Math.round(degrees / 22.5) % 16];
+        }
+
+        // Konvertiert Himmelsrichtung zu Grad (0° = Norden, im Uhrzeigersinn)
+        function directionToDegrees(dir) {
+            const dirMap = {
+                'N': 0, 'NNO': 22.5, 'NO': 45, 'ONO': 67.5,
+                'O': 90, 'OSO': 112.5, 'SO': 135, 'SSO': 157.5,
+                'S': 180, 'SSW': 202.5, 'SW': 225, 'WSW': 247.5,
+                'W': 270, 'WNW': 292.5, 'NW': 315, 'NNW': 337.5
+            };
+            return dirMap[dir.toUpperCase()] !== undefined ? dirMap[dir.toUpperCase()] : null;
+        }
+
+        // Parst erlaubte Windrichtung (z.B. "NNO-O") in Grad-Bereich
+        function parseAllowedWindDirection(allowedDir) {
+            if (!allowedDir) return null;
+            
+            const parts = allowedDir.split('-');
+            if (parts.length !== 2) return null;
+            
+            const startDir = directionToDegrees(parts[0].trim());
+            const endDir = directionToDegrees(parts[1].trim());
+            
+            if (startDir === null || endDir === null) return null;
+            
+            // Handle wrap-around (z.B. wenn Bereich über 360° geht)
+            if (startDir > endDir) {
+                // Bereich geht über 0° hinweg (z.B. NNW-N)
+                return { start: startDir, end: endDir + 360, wraps: true };
+            }
+            
+            return { start: startDir, end: endDir, wraps: false };
+        }
+
+        // Prüft, ob Windrichtung innerhalb des erlaubten Bereichs liegt
+        function isWindDirectionAllowed(windDirection, allowedDirectionRange) {
+            if (!allowedDirectionRange) return true; // Wenn keine Info, erlaube alles
+            
+            // wind_direction_10m aus der API ist die Herkunftsrichtung (woher Wind kommt)
+            // Prüfe direkt, ob die Windrichtung im erlaubten Bereich liegt
+            const fromDirection = windDirection;
+            
+            if (allowedDirectionRange.wraps) {
+                // Bereich geht über 0° hinweg (z.B. NNW-N)
+                return fromDirection >= allowedDirectionRange.start || fromDirection <= (allowedDirectionRange.end % 360);
+            } else {
+                // Normaler Bereich (z.B. NNO-O = 22.5° bis 90°)
+                return fromDirection >= allowedDirectionRange.start && fromDirection <= allowedDirectionRange.end;
+            }
+        }
+
+        async function loadData() {
+            try {
+                const weatherResponse = await fetch('/api/weather');
+                const weatherResult = await weatherResponse.json();
+                
+                if (weatherResult.success) {
+                    weatherData = weatherResult;
+                    availableDates = weatherResult.dates || [];
+                    updateLocationInfo(weatherResult);
+                    setupDaySelector();
+                    if (availableDates.length > 0) {
+                        currentDate = availableDates[0];
+                        updateChartsForDate(currentDate);
+                    }
+                } else {
+                    showError('Wetterdaten-Fehler: ' + weatherResult.error);
+                }
+
+                const evalResponse = await fetch('/api/evaluation');
+                const evalResult = await evalResponse.json();
+                
+                if (evalResult.success) {
+                    evaluationData = evalResult.evaluations || {};
+                    if (currentDate && evaluationData[currentDate]) {
+                        displayEvaluation(evaluationData[currentDate]);
+                    }
+                }
+                document.getElementById('loading-overlay').style.display = 'none';
+            } catch (error) {
+                showError('System-Fehler: ' + error.message);
+                document.getElementById('loading-overlay').style.display = 'none';
+            }
+        }
+
+        function setupDaySelector() {
+            const selector = document.getElementById('day-selector');
+            const select = document.getElementById('day-select');
+            
+            if (availableDates.length === 0) return;
+            
+            selector.style.display = 'flex';
+            select.innerHTML = '';
+            
+            availableDates.forEach((date, index) => {
+                const option = document.createElement('option');
+                const dateObj = new Date(date + 'T00:00:00');
+                const dateStr = dateObj.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: 'short' });
+                option.value = date;
+                option.textContent = dateStr;
+                if (index === 0) option.selected = true;
+                select.appendChild(option);
+            });
+            
+            select.addEventListener('change', function() {
+                currentDate = this.value;
+                updateChartsForDate(currentDate);
+                if (evaluationData && evaluationData[currentDate]) {
+                    displayEvaluation(evaluationData[currentDate]);
+                } else {
+                    document.getElementById('evaluation-section').style.display = 'none';
+                }
+            });
+        }
+
+        function updateChartsForDate(date) {
+            if (!weatherData?.days?.[date]) return;
+            drawUnifiedMeteogram(weatherData.days[date]);
+        }
+
+        function updateLocationInfo(data) {
+            const hours = data.flight_hours;
+            document.getElementById('location-info').textContent = 
+                `${data.location.name} • Startrichtung: ${data.location.windrichtung} • Flugfenster: ${hours.start}-${hours.end} Uhr`;
+        }
+
+        function displayEvaluation(eval) {
+            const section = document.getElementById('evaluation-section');
+            section.style.display = 'block';
+
+            const flyableBadge = document.getElementById('flyable-badge');
+            flyableBadge.textContent = eval.flyable ? 'Flugbar' : 'Nicht Flugbar';
+            flyableBadge.className = 'status-badge ' + (eval.flyable ? 'status-flyable' : 'status-not-flyable');
+
+            const condBadge = document.getElementById('conditions-badge');
+            condBadge.textContent = eval.conditions;
+            condBadge.className = 'conditions-badge conditions-' + eval.conditions.toLowerCase();
+            
+            // Setze Farbe des Condition Badges basierend auf Status
+            const colors = { EXCELLENT: '#10B981', GOOD: '#34D399', MODERATE: '#F59E0B', POOR: '#F87171', DANGEROUS: '#EF4444' };
+            condBadge.style.backgroundColor = `rgba(${parseInt(colors[eval.conditions].slice(1,3), 16)}, ${parseInt(colors[eval.conditions].slice(3,5), 16)}, ${parseInt(colors[eval.conditions].slice(5,7), 16)}, 0.2)`;
+            condBadge.style.color = colors[eval.conditions];
+            condBadge.style.border = `1px solid rgba(${parseInt(colors[eval.conditions].slice(1,3), 16)}, ${parseInt(colors[eval.conditions].slice(3,5), 16)}, ${parseInt(colors[eval.conditions].slice(5,7), 16)}, 0.3)`;
+
+            document.getElementById('rating-value').textContent = eval.rating;
+            document.getElementById('rating-stars').textContent = '★'.repeat(Math.round(eval.rating/2)) + '☆'.repeat(5 - Math.round(eval.rating/2));
+            document.getElementById('confidence-value').textContent = eval.confidence + '/10';
+            document.getElementById('confidence-fill').style.width = (eval.confidence * 10) + '%';
+
+            document.getElementById('summary').textContent = eval.summary;
+            document.getElementById('wind-detail').textContent = eval.details.wind;
+            document.getElementById('thermik-detail').textContent = eval.details.thermik;
+            document.getElementById('risks-detail').textContent = eval.details.risks;
+            document.getElementById('recommendation').textContent = eval.recommendation;
+        }
+
+        function drawUnifiedMeteogram(dayData) {
+            const container = d3.select('#unified-meteogram');
+            container.selectAll('*').remove();
+            
+            const rect = container.node().getBoundingClientRect();
+            const width = rect.width - margin.left - margin.right;
+            const height = rect.height - margin.top - margin.bottom;
+
+            const svg = container.append('svg')
+                .attr('width', width + margin.left + margin.right)
+                .attr('height', height + margin.top + margin.bottom);
+
+            // Gradients & Defs
+            const defs = svg.append('defs');
+            
+            const windGradient = defs.append('linearGradient').attr('id', 'wind-grad').attr('x1', '0').attr('y1', '0').attr('x2', '0').attr('y2', '1');
+            windGradient.append('stop').attr('offset', '0%').attr('stop-color', '#6366F1').attr('stop-opacity', '0.4');
+            windGradient.append('stop').attr('offset', '100%').attr('stop-color', '#6366F1').attr('stop-opacity', '0');
+
+            const thermikGradient = defs.append('linearGradient').attr('id', 'thermik-grad').attr('x1', '0').attr('y1', '0').attr('x2', '0').attr('y2', '1');
+            thermikGradient.append('stop').attr('offset', '0%').attr('stop-color', '#A855F7').attr('stop-opacity', '0.4');
+            thermikGradient.append('stop').attr('offset', '100%').attr('stop-color', '#A855F7').attr('stop-opacity', '0');
+
+            // Arrow Marker Definition
+            const arrowMarker = defs.append('marker')
+                .attr('id', 'wind-arrow-head')
+                .attr('viewBox', '0 0 10 10')
+                .attr('refX', 5)
+                .attr('refY', 5)
+                .attr('markerWidth', 4)
+                .attr('markerHeight', 4)
+                .attr('orient', 'auto');
+            arrowMarker.append('path')
+                .attr('d', 'M 0 0 L 10 5 L 0 10 z')
+                .attr('fill', '#F8FAFC');
+
+            const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+
+            // Datenvorbereitung
+            const times = dayData.wind.map(d => new Date(d.time));
+            const xScale = d3.scaleTime().domain(d3.extent(times)).range([0, width]);
+
+            // Lanes Definition (y-Offsets)
+            const lanes = {
+                wind: { y: 20, h: height * 0.45 },
+                thermik: { y: height * 0.50, h: height * 0.20 },
+                cloud: { y: height * 0.75, h: height * 0.20 }
+            };
+
+            // 1. Wind Lane
+            const maxWind = d3.max(dayData.wind, d => Math.max(d.speed, d.gusts));
+            const yWind = d3.scaleLinear().domain([0, Math.max(25, maxWind)]).range([lanes.wind.y + lanes.wind.h, lanes.wind.y]);
+
+            // Grid Wind
+            g.append('g').attr('class', 'grid')
+                .call(d3.axisLeft(yWind).ticks(5).tickSize(-width).tickFormat(''));
+
+            // Area Gusts
+            const gustArea = d3.area()
+                .x((d, i) => xScale(times[i]))
+                .y0(yWind(0))
+                .y1(d => yWind(d.gusts))
+                .curve(d3.curveMonotoneX);
+
+            g.append('path')
+                .datum(dayData.wind)
+                .attr('fill', 'url(#wind-grad)')
+                .attr('d', gustArea);
+
+            // Line Wind Speed
+            const windLine = d3.line()
+                .x((d, i) => xScale(times[i]))
+                .y(d => yWind(d.speed))
+                .curve(d3.curveMonotoneX);
+
+            g.append('path')
+                .datum(dayData.wind)
+                .attr('fill', 'none')
+                .attr('stroke', '#818CF8')
+                .attr('stroke-width', 3)
+                .attr('d', windLine);
+
+            // Wind Arrows
+            const arrowGroup = g.append('g');
+            dayData.wind.forEach((d, i) => {
+                const rotation = (d.direction + 180) % 360;
+                const x = xScale(times[i]);
+                const y = yWind(d.speed) - 10;
+                
+                arrowGroup.append('line')
+                    .attr('x1', x)
+                    .attr('y1', y + 5)
+                    .attr('x2', x)
+                    .attr('y2', y - 5)
+                    .attr('stroke', '#F8FAFC')
+                    .attr('stroke-width', 2)
+                    .attr('marker-end', 'url(#wind-arrow-head)')
+                    .attr('transform', `rotate(${rotation}, ${x}, ${y})`);
+            });
+
+            // 2. Thermik & Regen Lane
+            const maxCape = d3.max(dayData.thermik, d => d.cape) || 0;
+            const yThermik = d3.scaleLinear().domain([0, Math.max(1000, maxCape)]).range([lanes.thermik.y + lanes.thermik.h, lanes.thermik.y]);
+
+            const thermikArea = d3.area()
+                .x((d, i) => xScale(times[i]))
+                .y0(yThermik(0))
+                .y1(d => yThermik(d.cape))
+                .curve(d3.curveMonotoneX);
+
+            g.append('path')
+                .datum(dayData.thermik)
+                .attr('fill', 'url(#thermik-grad)')
+                .attr('d', thermikArea);
+
+            // Regen Balken (Overlay)
+            const yPrecip = d3.scaleLinear().domain([0, 5]).range([lanes.thermik.y + lanes.thermik.h, lanes.thermik.y]);
+            g.selectAll('.rain-bar')
+                .data(dayData.precipitation)
+                .enter().append('rect')
+                .attr('x', (d, i) => xScale(times[i]) - 3)
+                .attr('y', d => yPrecip(d.amount))
+                .attr('width', 6)
+                .attr('height', d => (lanes.thermik.y + lanes.thermik.h) - yPrecip(d.amount))
+                .attr('fill', '#38BDF8')
+                .attr('rx', 2);
+
+            // 3. Cloud Lane
+            const minCloud = d3.min(dayData.cloudbase, d => d.height);
+            const maxCloud = d3.max(dayData.cloudbase, d => d.height);
+            const yCloud = d3.scaleLinear().domain([Math.max(0, minCloud - 500), maxCloud + 500]).range([lanes.cloud.y + lanes.cloud.h, lanes.cloud.y]);
+
+            const cloudLine = d3.line()
+                .x((d, i) => xScale(times[i]))
+                .y(d => yCloud(d.height))
+                .curve(d3.curveMonotoneX);
+
+            g.append('path')
+                .datum(dayData.cloudbase)
+                .attr('fill', 'none')
+                .attr('stroke', '#BAE6FD')
+                .attr('stroke-width', 2)
+                .attr('stroke-dasharray', '4,4')
+                .attr('d', cloudLine);
+
+            // Achsen & Labels
+            g.append('g').attr('class', 'axis')
+                .attr('transform', `translate(0,${height})`)
+                .call(d3.axisBottom(xScale).ticks(d3.timeHour.every(1)).tickFormat(formatTime));
+
+            g.append('text').attr('class', 'lane-label').attr('x', -margin.left + 10).attr('y', lanes.wind.y + 15).text('Wind');
+            g.append('text').attr('class', 'lane-label').attr('x', -margin.left + 10).attr('y', lanes.thermik.y + 15).text('Thermik');
+            g.append('text').attr('class', 'lane-label').attr('x', -margin.left + 10).attr('y', lanes.cloud.y + 15).text('Cloud');
+
+            // Legend
+            const legend = svg.append('g').attr('transform', `translate(${margin.left}, ${height + margin.top + 25})`);
+            const legendItems = [
+                { color: '#818CF8', label: 'Wind' },
+                { color: 'url(#wind-grad)', label: 'Böen' },
+                { color: 'url(#thermik-grad)', label: 'CAPE' },
+                { color: '#38BDF8', label: 'Regen' },
+                { color: '#BAE6FD', label: 'Wolken' }
+            ];
+
+            legendItems.forEach((item, i) => {
+                const lg = legend.append('g').attr('transform', `translate(${i * 100}, 0)`);
+                lg.append('rect').attr('width', 12).attr('height', 12).attr('rx', 3).attr('fill', item.color);
+                lg.append('text').attr('x', 18).attr('y', 10).attr('fill', 'var(--color-text-light)').style('font-size', '11px').style('font-weight', '600').text(item.label);
+            });
+
+            // Interactive Elements
+            const hoverLine = g.append('line').attr('stroke', '#F8FAFC').attr('stroke-width', 1).attr('stroke-dasharray', '4,4').attr('y1', 0).attr('y2', height).style('opacity', 0);
+
+            const overlay = g.append('rect').attr('width', width).attr('height', height).attr('fill', 'none').attr('pointer-events', 'all');
+
+            overlay.on('mousemove', function(event) {
+                const [mx] = d3.pointer(event);
+                const date = xScale.invert(mx);
+                const bisect = d3.bisector(d => d).left;
+                const idx = bisect(times, date);
+                const d = dayData.wind[idx] || dayData.wind[idx-1];
+                const t = dayData.thermik[idx] || dayData.thermik[idx-1];
+                const c = dayData.cloudbase[idx] || dayData.cloudbase[idx-1];
+                const p = dayData.precipitation[idx] || dayData.precipitation[idx-1];
+
+                if (!d) return;
+
+                const curX = xScale(times[idx]);
+                hoverLine.attr('x1', curX).attr('x2', curX).style('opacity', 1);
+
+                tooltip.style('opacity', 1)
+                    .style('left', (event.pageX + 20) + 'px')
+                    .style('top', (event.pageY - 20) + 'px')
+                    .html(`
+                        <div style="font-weight:800; border-bottom:1px solid rgba(255,255,255,0.1); margin-bottom:8px; padding-bottom:4px;">${formatTime(times[idx])} Uhr</div>
+                        <div class="tooltip-row"><span class="tooltip-label">Wind</span><span class="tooltip-value">${d.speed.toFixed(1)} km/h</span></div>
+                        <div class="tooltip-row"><span class="tooltip-label">Böen</span><span class="tooltip-value">${d.gusts.toFixed(1)} km/h</span></div>
+                        <div class="tooltip-row"><span class="tooltip-label">Richtung</span><span class="tooltip-value">${d.direction}° (${getWindDirectionName(d.direction)})</span></div>
+                        <div class="tooltip-row" style="margin-top:4px;"><span class="tooltip-label">CAPE</span><span class="tooltip-value">${t ? t.cape.toFixed(0) : 0} J/kg</span></div>
+                        <div class="tooltip-row"><span class="tooltip-label">Regen</span><span class="tooltip-value">${p ? p.amount.toFixed(1) : 0} mm</span></div>
+                        <div class="tooltip-row"><span class="tooltip-label">Cloud</span><span class="tooltip-value">${c ? c.height.toFixed(0) : 0} m</span></div>
+                    `);
+            }).on('mouseleave', () => {
+                hoverLine.style('opacity', 0);
+                tooltip.style('opacity', 0);
+            });
+        }
+
+        function showError(message) {
+            const container = document.querySelector('.container');
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error';
+            errorDiv.textContent = message;
+            container.insertBefore(errorDiv, container.firstChild);
+        }
+
+        // Test-E-Mail Button Handler
+        document.getElementById('test-email-btn').addEventListener('click', async function() {
+            const btn = this;
+            const messageDiv = document.getElementById('test-email-message');
+            
+            // Button deaktivieren
+            btn.disabled = true;
+            btn.textContent = '📧 Sende...';
+            messageDiv.className = 'test-email-message';
+            messageDiv.textContent = '';
+            
+            try {
+                const response = await fetch('/api/test-email', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    messageDiv.className = 'test-email-message success';
+                    messageDiv.textContent = '✅ ' + data.message;
+                } else {
+                    messageDiv.className = 'test-email-message error';
+                    messageDiv.textContent = '❌ ' + (data.error || 'Unbekannter Fehler');
+                }
+            } catch (error) {
+                messageDiv.className = 'test-email-message error';
+                messageDiv.textContent = '❌ Fehler beim Senden: ' + error.message;
+            } finally {
+                // Button wieder aktivieren
+                btn.disabled = false;
+                btn.textContent = '📧 Test-E-Mail senden';
+            }
+        });
+
+        loadData();
+    </script>
+</body>
+</html>
+

@@ -1,0 +1,38 @@
+{
+  "last_updated": "2026-01-04T16:59:14.468140",
+  "location": "Uetliberg - Startplatz Balderen",
+  "evaluations": [
+    {
+      "flyable": false,
+      "rating": 2,
+      "confidence": 9,
+      "conditions": "POOR",
+      "summary": "Die Windrichtung ist nicht optimal und die Thermikbedingungen sind schlecht. Die Wolkenbasis ist niedrig und die Bewölkung hoch.",
+      "details": {
+        "wind": "Die Windrichtung variiert zwischen 229° und 294°, was nicht den erlaubten Windrichtungen NNO-O entspricht. Die Windgeschwindigkeit liegt zwischen 5.5km/h und 15.8km/h, mit Böen bis zu 37.1km/h. Die Windbedingungen sind daher nicht optimal für den Startplatz Balderen am Uetliberg.",
+        "thermik": "Die Thermikbedingungen sind sehr schlecht. Der CAPE-Wert ist durchgehend 0.0 J/kg, was auf keine Thermik hindeutet. Die Sonnenscheindauer beträgt maximal 1.0 Stunde und die Bewölkung liegt zwischen 60% und 99%. Die Temperaturen liegen zwischen -5.1°C und -3.1°C.",
+        "risks": "Die Wolkenbasis liegt zwischen 700m und 20900m, wobei sie erst ab 14:00 Uhr auf über 2000m steigt. Die Bewölkung liegt zwischen 0% und 99%, wobei sie erst ab 14:00 Uhr unter 70% fällt. Es ist kein Niederschlag zu erwarten. Die Temperaturen liegen zwischen -5.1°C und -3.1°C."
+      },
+      "recommendation": "Aufgrund der ungünstigen Windrichtung, der schlechten Thermikbedingungen und der hohen Bewölkung wird vom Fliegen abgeraten. Die Sicherheit sollte immer an erster Stelle stehen.",
+      "location": "Uetliberg - Startplatz Balderen",
+      "date": "2026-01-03",
+      "timestamp": "2026-01-04T16:59:03.914580"
+    },
+    {
+      "flyable": false,
+      "rating": 2,
+      "confidence": 9,
+      "conditions": "POOR",
+      "summary": "Die Windstärke ist zu niedrig für Soaring und es gibt kein Thermikpotenzial. Die Wetterbedingungen sind nicht geeignet für Gleitschirmfliegen am Uetliberg.",
+      "details": {
+        "wind": "Die Windrichtung liegt zwischen 58° und 180°, was innerhalb der erlaubten Startbereiche (NNO-O) liegt. Die Windgeschwindigkeit liegt jedoch zwischen 1.1km/h und 5.0km/h mit Böen bis zu 11.5km/h, was unter dem benötigten Minimum von 15km/h für Soaring am Uetliberg liegt.",
+        "thermik": "Der CAPE-Wert ist durchgehend 0.0 J/kg, was auf keine Thermik hindeutet. Die Sonnenscheindauer liegt zwischen 0 und 1 Stunde und die Bewölkung variiert zwischen 0% und 63%. Die Temperaturen liegen zwischen -6.8°C und -3.9°C.",
+        "risks": "Die Wolkenbasis liegt zwischen 740m und 20900m. Es gibt keinen Niederschlag. Die Bewölkung variiert zwischen 0% und 63% und die Temperaturen liegen zwischen -6.8°C und -3.9°C."
+      },
+      "recommendation": "Aufgrund der niedrigen Windstärke und des fehlenden Thermikpotenzials wird nicht empfohlen, am Uetliberg Gleitschirm zu fliegen.",
+      "location": "Uetliberg - Startplatz Balderen",
+      "date": "2026-01-04",
+      "timestamp": "2026-01-04T16:59:14.467879"
+    }
+  ]
+}

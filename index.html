@@ -1,0 +1,1708 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flugwetter Dashboard - Uetliberg</title>
+    <style>
+        :root {
+            --color-primary: #2563EB;
+            --color-success: #10B981;
+            --color-warning: #F59E0B;
+            --color-danger: #EF4444;
+            --color-bg: #F9FAFB;
+            --color-text: #111827;
+            --color-text-light: #6B7280;
+            --color-border: #E5E7EB;
+            --color-card: #FFFFFF;
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: var(--color-text);
+            line-height: 1.6;
+            padding: 0;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Header */
+        .header {
+            background: white;
+            border-radius: 16px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+            border: none;
+            animation: slideDown 0.5s ease-out;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .header-title {
+            font-size: 32px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 4px;
+        }
+
+        .header-subtitle {
+            font-size: 16px;
+            color: var(--color-text-light);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .summary-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 20px;
+            border-radius: 25px;
+            font-size: 14px;
+            font-weight: 600;
+            background: white;
+            border: 2px solid #e8e9ea;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s;
+        }
+
+        .summary-badge:hover {
+            transform: scale(1.05);
+        }
+
+        .summary-badge.good {
+            background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+            border-color: var(--color-success);
+            color: #155724;
+        }
+
+        .summary-badge.warning {
+            background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+            border-color: var(--color-warning);
+            color: #856404;
+        }
+
+        .summary-badge.danger {
+            background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
+            border-color: var(--color-danger);
+            color: #721c24;
+        }
+
+        /* Evaluierungs-Badge */
+        .evaluation-badge {
+            margin-top: 16px;
+            padding: 16px;
+            background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+            border-radius: 12px;
+            border: 2px solid #e8e9ea;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .evaluation-header {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+        }
+
+        .evaluation-flyable {
+            font-weight: 700;
+            font-size: 16px;
+            padding: 6px 12px;
+            border-radius: 8px;
+        }
+
+        .evaluation-flyable.flyable-yes {
+            background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+            color: #155724;
+        }
+
+        .evaluation-flyable.flyable-no {
+            background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
+            color: #721c24;
+        }
+
+        .evaluation-conditions {
+            font-weight: 600;
+            font-size: 14px;
+            padding: 6px 12px;
+            border-radius: 8px;
+        }
+
+        .evaluation-conditions.evaluation-excellent {
+            background: linear-gradient(135deg, #d1ecf1 0%, #bee5eb 100%);
+            color: #0c5460;
+        }
+
+        .evaluation-conditions.evaluation-good {
+            background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+            color: #155724;
+        }
+
+        .evaluation-conditions.evaluation-moderate {
+            background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+            color: #856404;
+        }
+
+        .evaluation-conditions.evaluation-danger {
+            background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
+            color: #721c24;
+        }
+
+        .evaluation-rating {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #333;
+        }
+
+        .evaluation-summary {
+            font-size: 14px;
+            color: #666;
+            line-height: 1.5;
+            margin-bottom: 8px;
+        }
+
+        .evaluation-updated {
+            font-size: 11px;
+            color: #999;
+            font-style: italic;
+        }
+
+        /* Charts Section */
+        .charts-section {
+            background: white;
+            border-radius: 16px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+            border: none;
+            animation: slideUp 0.5s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .chart-container {
+            margin-bottom: 40px;
+            padding: 20px;
+            background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+            border-radius: 12px;
+            border: 1px solid #e8e9ea;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .chart-container:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.15);
+            border-color: #667eea;
+        }
+
+        .chart-container:last-child {
+            margin-bottom: 0;
+        }
+
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .chart-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--color-text);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .chart-value {
+            font-size: 14px;
+            color: var(--color-text-light);
+            font-weight: 500;
+        }
+
+        .sparkline-container {
+            position: relative;
+            height: 100px;
+            width: 100%;
+            overflow-x: auto;
+            overflow-y: visible;
+            margin-top: 8px;
+        }
+
+        .sparkline-svg {
+            height: 100px;
+            display: block;
+        }
+
+        /* HTML-basierte Chart-Styles */
+        .html-chart-container {
+            position: relative;
+            width: 100%;
+            overflow-x: auto;
+            margin-top: 8px;
+        }
+
+        .html-chart-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(50px, 1fr));
+            gap: 0;
+            position: relative;
+            min-width: 100%;
+        }
+
+        .html-chart-area {
+            position: relative;
+            height: 60px;
+            margin-bottom: 35px;
+        }
+
+        .html-chart-line-segment {
+            position: absolute;
+            height: 2px;
+            background: #2563EB;
+            transform-origin: left center;
+            z-index: 1;
+        }
+
+        .html-chart-point {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 2;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .html-chart-point:hover {
+            width: 12px;
+            height: 12px;
+            box-shadow: 0 0 8px rgba(0, 0, 0, 0.3);
+        }
+
+        .html-chart-point.wind-good {
+            background: #10B981;
+        }
+
+        .html-chart-point.wind-warning {
+            background: #F59E0B;
+        }
+
+        .html-chart-point.wind-danger {
+            background: #EF4444;
+        }
+
+        .html-chart-point.thermik-low {
+            background: #2563EB;
+        }
+
+        .html-chart-point.thermik-medium {
+            background: #F59E0B;
+        }
+
+        .html-chart-point.thermik-high {
+            background: #EF4444;
+        }
+
+        .html-chart-point.cloud-safe {
+            background: #2563EB;
+        }
+
+        .html-chart-point.cloud-danger {
+            background: #EF4444;
+        }
+
+        .html-chart-arrow-container {
+            position: absolute;
+            width: 24px;
+            height: 24px;
+            transform: translate(-50%, -50%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 3;
+        }
+
+        .html-chart-arrow {
+            width: 0;
+            height: 0;
+            border-left: 6px solid transparent;
+            border-right: 6px solid transparent;
+            border-bottom: 12px solid currentColor;
+            position: relative;
+        }
+
+        .html-chart-arrow::after {
+            content: '';
+            position: absolute;
+            top: 8px;
+            left: -3px;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: currentColor;
+        }
+
+        .html-chart-arrow.wind-good {
+            color: #10B981;
+        }
+
+        .html-chart-arrow.wind-warning {
+            color: #F59E0B;
+        }
+
+        .html-chart-arrow.wind-danger {
+            color: #EF4444;
+        }
+
+        .html-chart-label {
+            position: absolute;
+            top: 70px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 10px;
+            color: #6B7280;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .html-chart-reference-line {
+            position: absolute;
+            left: 0;
+            right: 0;
+            height: 1px;
+            border-top: 1px dashed #6B7280;
+            z-index: 0;
+        }
+
+        .bar-chart-container {
+            display: flex;
+            align-items: flex-end;
+            height: 80px;
+            gap: 4px;
+            margin-top: 8px;
+            overflow-x: auto;
+            min-width: 100%;
+        }
+        
+        .bar-chart-container .bar-item {
+            flex: 1;
+            min-width: 50px;
+        }
+
+        .bar-item {
+            flex: 1;
+            background: var(--color-primary);
+            border-radius: 4px 4px 0 0;
+            min-height: 4px;
+            transition: all 0.2s;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .bar-item:hover {
+            opacity: 0.8;
+            transform: translateY(-2px);
+        }
+
+        .bar-item.has-precipitation {
+            background: var(--color-primary);
+        }
+
+        .bar-item.has-storm {
+            background: var(--color-danger);
+        }
+
+        /* Hour Cards */
+        .cards-section {
+            margin-top: 30px;
+            background: white;
+            border-radius: 16px;
+            padding: 30px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+            animation: slideUp 0.6s ease-out;
+        }
+
+        .cards-scroll {
+            display: flex;
+            gap: 20px;
+            overflow-x: auto;
+            padding: 10px 0;
+            scroll-behavior: smooth;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .cards-scroll::-webkit-scrollbar {
+            height: 8px;
+        }
+
+        .cards-scroll::-webkit-scrollbar-track {
+            background: var(--color-bg);
+            border-radius: 4px;
+        }
+
+        .cards-scroll::-webkit-scrollbar-thumb {
+            background: var(--color-border);
+            border-radius: 4px;
+        }
+
+        .hour-card {
+            min-width: 200px;
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            border: 2px solid #e8e9ea;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hour-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            transform: scaleX(0);
+            transition: transform 0.3s;
+        }
+
+        .hour-card:hover {
+            border-color: #667eea;
+            box-shadow: 0 12px 30px rgba(102, 126, 234, 0.2);
+            transform: translateY(-8px) scale(1.02);
+        }
+
+        .hour-card:hover::before {
+            transform: scaleX(1);
+        }
+
+        .hour-card.active {
+            border-color: #667eea;
+            box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1), 0 12px 30px rgba(102, 126, 234, 0.2);
+            background: linear-gradient(135deg, #f0f4ff 0%, #ffffff 100%);
+        }
+
+        .hour-card.active::before {
+            transform: scaleX(1);
+        }
+
+        .hour-card.danger {
+            border-color: var(--color-danger);
+            background: linear-gradient(135deg, #fff5f5 0%, #ffffff 100%);
+        }
+
+        .hour-card.danger::before {
+            background: linear-gradient(90deg, #ef4444 0%, #dc2626 100%);
+        }
+
+        .hour-time {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--color-text);
+            margin-bottom: 12px;
+        }
+
+        .hour-metrics {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-top: 8px;
+        }
+
+        .wind-info-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .metric {
+            display: flex;
+            flex-direction: column;
+            padding: 10px;
+            background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+            border-radius: 8px;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+        }
+
+        .metric:hover {
+            background: linear-gradient(135deg, #e9ecef 0%, #f8f9fa 100%);
+            border-color: #667eea;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+        }
+
+        .metric-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            color: var(--color-text-light);
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+        }
+
+        .metric-value {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--color-text);
+        }
+
+        .metric-value.wind-good { color: var(--color-success); }
+        .metric-value.wind-warning { color: var(--color-warning); }
+        .metric-value.wind-danger { color: var(--color-danger); }
+
+        /* Windrichtungs-Pfeile */
+        .wind-arrow-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            margin: 8px 0;
+        }
+
+        .wind-arrow {
+            transition: transform 0.2s ease;
+            transform-origin: center;
+        }
+
+        .wind-arrow-large {
+            width: 50px;
+            height: 50px;
+        }
+
+        .wind-arrow-small {
+            width: 24px;
+            height: 24px;
+        }
+
+        .wind-arrow svg {
+            width: 100%;
+            height: 100%;
+        }
+
+        .wind-arrow.wind-good svg {
+            stroke: var(--color-success);
+            fill: var(--color-success);
+        }
+
+        .wind-arrow.wind-warning svg {
+            stroke: var(--color-warning);
+            fill: var(--color-warning);
+        }
+
+        .wind-arrow.wind-danger svg {
+            stroke: var(--color-danger);
+            fill: var(--color-danger);
+        }
+
+        .wind-direction-label {
+            font-size: 10px;
+            color: var(--color-text-light);
+            margin-top: 4px;
+            font-weight: 600;
+        }
+
+        /* Loading & Error */
+        .loading, .error {
+            text-align: center;
+            padding: 60px 20px;
+            font-size: 18px;
+            color: var(--color-text-light);
+        }
+
+        .error {
+            color: var(--color-danger);
+            background: #FEF2F2;
+            border-radius: 12px;
+            border: 1px solid var(--color-danger);
+        }
+
+        /* Overlay */
+        .overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            padding: 20px;
+            overflow-y: auto;
+            backdrop-filter: blur(4px);
+        }
+
+        .overlay.active {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .overlay-content {
+            background: var(--color-card);
+            color: var(--color-text);
+            padding: 32px;
+            border-radius: 12px;
+            max-width: 600px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .overlay-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 2px solid var(--color-border);
+        }
+
+        .overlay-header h2 {
+            font-size: 24px;
+        }
+
+        .close-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 14px;
+            cursor: pointer;
+            font-weight: 600;
+            border-radius: 25px;
+            transition: all 0.3s;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+
+        .close-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .close-btn:active {
+            transform: translateY(0);
+        }
+
+        .overlay-details {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .detail-item {
+            padding: 18px;
+            background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+            border-radius: 12px;
+            border: 1px solid #e8e9ea;
+            transition: all 0.2s;
+        }
+
+        .detail-item:hover {
+            border-color: #667eea;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.1);
+        }
+
+        .detail-item strong {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 12px;
+            text-transform: uppercase;
+            color: var(--color-text-light);
+            letter-spacing: 0.5px;
+        }
+
+        .detail-item span {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .container {
+                padding: 12px;
+            }
+
+            .header-top {
+                flex-direction: column;
+            }
+
+            .header-title {
+                font-size: 24px;
+            }
+
+            .charts-section {
+                padding: 16px;
+            }
+
+            .hour-card {
+                min-width: 160px;
+            }
+
+            .overlay-content {
+                padding: 24px;
+            }
+
+            .overlay-details {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Chart highlight on hover */
+        .chart-highlight {
+            opacity: 0.3;
+            transition: opacity 0.2s;
+        }
+
+        .chart-highlight.active {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="header-top">
+                <div>
+                    <h1 class="header-title" id="location-name">Flugwetter Dashboard</h1>
+                    <div class="header-subtitle">
+                        <span id="date-display">Lade Daten...</span>
+                        <span>•</span>
+                        <span id="time-window"></span>
+                    </div>
+                </div>
+                <div class="summary-badge" id="summary-badge">
+                    <span id="summary-text">Lade Daten...</span>
+                </div>
+            </div>
+        </div>
+
+        <div id="charts-section" class="charts-section">
+            <div class="loading">
+                <div style="text-align: center; padding: 40px;">
+                    <div style="font-size: 24px; margin-bottom: 16px;">⏳</div>
+                    <div style="font-size: 18px; font-weight: 600; margin-bottom: 8px;">Lade Wetterdaten...</div>
+                    <div style="font-size: 14px; color: #6B7280;">Bitte warten Sie einen Moment</div>
+                    <div style="margin-top: 16px; font-size: 12px; color: #9CA3AF;" id="loading-status">Initialisiere...</div>
+                </div>
+            </div>
+        </div>
+
+        <div id="cards-section" class="cards-section">
+            <div class="cards-scroll" id="cards-scroll"></div>
+        </div>
+    </div>
+
+    <!-- Detail Overlay -->
+    <div class="overlay" id="detail-overlay">
+        <div class="overlay-content">
+            <div class="overlay-header">
+                <h2 id="overlay-time"></h2>
+                <button class="close-btn" onclick="closeOverlay()">✕ Schließen</button>
+            </div>
+            <div class="overlay-details" id="overlay-details"></div>
+        </div>
+    </div>
+
+    <script>
+        // Konfiguration
+        const FLIGHT_HOURS_START = 9;
+        const FLIGHT_HOURS_END = 18;
+        const STARTPLATZ_HOEHE = 850;
+
+        let weatherData = null;
+        let currentDate = null;
+        let hoursData = [];
+        let activeHourIndex = null;
+        let evaluationsData = null;
+
+        // Lade Wetterdaten
+        async function loadWeatherData() {
+            const loadingStatus = document.getElementById('loading-status');
+            const updateStatus = (msg) => {
+                if (loadingStatus) loadingStatus.textContent = msg;
+                console.log('[STATUS]', msg);
+            };
+            
+            try {
+                updateStatus('Starte Datenladung...');
+                console.log('[DEBUG] Starte Datenladung...');
+                console.log('[DEBUG] Flugstunden-Konfiguration:', FLIGHT_HOURS_START, '-', FLIGHT_HOURS_END);
+                
+                // Timeout für Fetch-Request (10 Sekunden)
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 10000);
+                
+                updateStatus('Lade JSON-Datei...');
+                let response;
+                try {
+                    response = await fetch('data/wetterdaten.json', {
+                        signal: controller.signal,
+                        cache: 'no-cache'
+                    });
+                    clearTimeout(timeoutId);
+                } catch (fetchError) {
+                    clearTimeout(timeoutId);
+                    if (fetchError.name === 'AbortError') {
+                        updateStatus('❌ Zeitüberschreitung!');
+                        throw new Error('Zeitüberschreitung beim Laden der Daten. Bitte prüfen Sie die Verbindung.');
+                    }
+                    updateStatus('❌ Fehler beim Laden!');
+                    throw fetchError;
+                }
+                
+                updateStatus('Parse JSON-Daten...');
+                
+                if (!response.ok) {
+                    const errorMsg = `HTTP-Fehler: ${response.status} ${response.statusText}`;
+                    console.error('[FEHLER]', errorMsg);
+                    throw new Error(errorMsg);
+                }
+                
+                const data = await response.json();
+                updateStatus('Verarbeite Daten...');
+                console.log('[DEBUG] Daten geladen:', Object.keys(data));
+                console.log('[DEBUG] Anzahl Standorte:', Object.keys(data).length);
+                
+                const locationName = Object.keys(data)[0];
+                if (!locationName) {
+                    const errorMsg = 'Keine Standorte in den Daten gefunden';
+                    console.error('[FEHLER]', errorMsg);
+                    updateStatus('❌ ' + errorMsg);
+                    throw new Error(errorMsg);
+                }
+                
+                weatherData = data[locationName];
+                console.log('[DEBUG] Standort:', locationName);
+                console.log('[DEBUG] Wetterdaten vorhanden:', !!weatherData);
+                console.log('[DEBUG] Stunden-Daten vorhanden:', !!(weatherData && weatherData.hourly_data));
+                
+                if (!weatherData || !weatherData.hourly_data) {
+                    const errorMsg = 'Keine Wetterdaten gefunden';
+                    console.error('[FEHLER]', errorMsg);
+                    updateStatus('❌ ' + errorMsg);
+                    throw new Error(errorMsg);
+                }
+
+                console.log('[DEBUG] Anzahl Zeitstempel:', Object.keys(weatherData.hourly_data).length);
+
+                // Setze Header
+                document.getElementById('location-name').textContent = `Flugwetter ${locationName}`;
+                
+                // Finde ersten Tag mit Flugstunden
+                updateStatus('Suche Flugstunden...');
+                console.log('[DEBUG] Suche nach Flugstunden...');
+                const firstDay = getFirstFlightDay(weatherData.hourly_data);
+                if (!firstDay) {
+                    const errorMsg = 'Keine Flugstunden-Daten gefunden. Bitte prüfen Sie die Daten oder die Flugstunden-Konfiguration.';
+                    console.error('[FEHLER]', errorMsg);
+                    console.error('[FEHLER] Verfügbare Zeitstempel:', Object.keys(weatherData.hourly_data).slice(0, 10));
+                    throw new Error(errorMsg);
+                }
+                
+                console.log('[DEBUG] Tag gefunden:', firstDay.date, 'mit', firstDay.hours.length, 'Stunden');
+                
+                if (!firstDay.hours || firstDay.hours.length === 0) {
+                    const errorMsg = 'Keine Stunden-Daten verfügbar';
+                    console.error('[FEHLER]', errorMsg);
+                    throw new Error(errorMsg);
+                }
+                
+                hoursData = firstDay.hours;
+                currentDate = firstDay.date;
+                
+                document.getElementById('date-display').textContent = formatDate(firstDay.date);
+                document.getElementById('time-window').textContent = `${FLIGHT_HOURS_START}:00 - ${FLIGHT_HOURS_END}:00 Uhr`;
+                
+                // Lade Evaluierungen aus JSON
+                updateStatus('Lade Evaluierungen...');
+                try {
+                    const evalResponse = await fetch('data/evaluations.json', {
+                        signal: controller.signal,
+                        cache: 'no-cache'
+                    });
+                    if (evalResponse.ok) {
+                        const evalData = await evalResponse.json();
+                        evaluationsData = evalData;
+                        console.log('[DEBUG] Evaluierungen geladen:', evalData.evaluations?.length || 0, 'Tage');
+                        
+                        // Zeige Evaluierung für aktuellen Tag falls verfügbar
+                        const currentEvaluation = evalData.evaluations?.find(e => e.date === firstDay.date);
+                        if (currentEvaluation) {
+                            displayEvaluation(currentEvaluation, evalData.last_updated);
+                        }
+                    } else {
+                        console.warn('[WARNUNG] Evaluierungen nicht verfügbar:', evalResponse.status);
+                    }
+                } catch (evalError) {
+                    console.warn('[WARNUNG] Fehler beim Laden der Evaluierungen:', evalError);
+                    // Evaluierungen sind optional, fahre fort
+                }
+                
+                const summary = generateSummary(firstDay.hours);
+                document.getElementById('summary-text').textContent = summary.text;
+                document.getElementById('summary-badge').className = `summary-badge ${summary.type}`;
+                
+                // Erstelle Visualisierungen
+                updateStatus('Erstelle Visualisierungen...');
+                console.log('[DEBUG] Erstelle Visualisierungen...');
+                createCharts(firstDay.hours);
+                createHourCards(firstDay.hours);
+                
+                updateStatus('✅ Fertig!');
+                console.log('[DEBUG] Dashboard erfolgreich erstellt');
+            } catch (error) {
+                console.error('[FEHLER]', error);
+                console.error('[FEHLER] Stack:', error.stack);
+                
+                // Zeige Fehler in der UI
+                const chartsSection = document.getElementById('charts-section');
+                if (chartsSection) {
+                    chartsSection.innerHTML = 
+                        `<div class="error">
+                            <strong>Fehler beim Laden der Wetterdaten:</strong><br>
+                            ${error.message}<br>
+                            <br>
+                            <small>Bitte Browser-Konsole (F12) für Details öffnen</small><br>
+                            <small>Stellen Sie sicher, dass data/wetterdaten.json existiert und korrekt formatiert ist.</small>
+                        </div>`;
+                } else {
+                    // Falls charts-section nicht existiert, zeige Fehler im Body
+                    document.body.innerHTML = 
+                        `<div style="padding: 20px; color: red;">
+                            <h1>Fehler beim Laden</h1>
+                            <p>${error.message}</p>
+                            <p>Bitte Browser-Konsole (F12) für Details öffnen</p>
+                        </div>`;
+                }
+            }
+        }
+
+        function getFirstFlightDay(hourlyData) {
+            console.log('[DEBUG] getFirstFlightDay: Verarbeite', Object.keys(hourlyData).length, 'Zeitstempel');
+            const days = {};
+            
+            for (const [timestamp, data] of Object.entries(hourlyData)) {
+                try {
+                    // Parse Zeitstempel - füge Zeitzone hinzu falls fehlt
+                    let dt;
+                    if (timestamp.includes('Z') || timestamp.includes('+') || timestamp.includes('-', 10)) {
+                        // Hat bereits Zeitzone
+                        dt = new Date(timestamp);
+                    } else {
+                        // Keine Zeitzone - füge UTC hinzu für konsistente Parsing
+                        dt = new Date(timestamp + 'Z');
+                    }
+                    
+                    if (isNaN(dt.getTime())) {
+                        console.warn('[WARNUNG] Ungültiger Zeitstempel:', timestamp);
+                        continue;
+                    }
+                    
+                    // Verwende lokale Zeit für Datum und Stunde
+                    // JavaScript konvertiert UTC-Zeitstempel automatisch in lokale Zeit
+                    const localDate = new Date(dt.getTime());
+                    // Verwende lokales Datum für dateKey
+                    const year = localDate.getFullYear();
+                    const month = String(localDate.getMonth() + 1).padStart(2, '0');
+                    const day = String(localDate.getDate()).padStart(2, '0');
+                    const dateKey = `${year}-${month}-${day}`;
+                    
+                    if (!days[dateKey]) {
+                        days[dateKey] = [];
+                    }
+                    
+                    // Hole Stunde aus lokaler Zeit (da FLIGHT_HOURS_START/END in lokaler Zeit sind)
+                    const hour = localDate.getHours();
+                    // Reduziere Logs für Performance (nur erste 3 Zeitstempel)
+                    if (Object.keys(days).length === 0 && Object.values(days).flat().length < 3) {
+                        console.log('[DEBUG] Zeitstempel:', timestamp, '-> Lokale Zeit:', localDate.toLocaleString('de-CH'), 'Stunde:', hour);
+                    }
+                    
+                    if (hour >= FLIGHT_HOURS_START && hour < FLIGHT_HOURS_END) {
+                        days[dateKey].push({ timestamp, data, hour });
+                    }
+                } catch (e) {
+                    console.warn('[WARNUNG] Fehler beim Verarbeiten von', timestamp, ':', e);
+                }
+            }
+            
+            console.log('[DEBUG] Gefundene Tage:', Object.keys(days));
+            console.log('[DEBUG] Tage mit Flugstunden:', Object.keys(days).map(d => ({ date: d, count: days[d].length })));
+            
+            const sortedDates = Object.keys(days).sort();
+            for (const date of sortedDates) {
+                if (days[date].length > 0) {
+                    days[date].sort((a, b) => a.hour - b.hour);
+                    console.log('[DEBUG] Rückgabe Tag:', date, 'mit', days[date].length, 'Stunden');
+                    return { date, hours: days[date] };
+                }
+            }
+            
+            console.warn('[WARNUNG] Kein Tag mit Flugstunden gefunden');
+            return null;
+        }
+
+        function formatDate(dateStr) {
+            const dt = new Date(dateStr + 'T12:00:00');
+            return dt.toLocaleDateString('de-CH', { 
+                weekday: 'long', 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+            });
+        }
+
+        function generateSummary(hours) {
+            const windSpeeds = hours.map(h => h.data.wind_speed_10m || 0);
+            const precip = hours.some(h => (h.data.precipitation || 0) > 0);
+            const avgWind = windSpeeds.reduce((a, b) => a + b, 0) / windSpeeds.length;
+            
+            let text = '';
+            let type = 'good';
+            
+            if (precip) {
+                text = '⚠️ Niederschlag erwartet';
+                type = 'danger';
+            } else if (avgWind > 25) {
+                text = '⚠️ Starker Wind erwartet';
+                type = 'danger';
+            } else if (avgWind > 20) {
+                text = '⚡ Windzunahme möglich';
+                type = 'warning';
+            } else {
+                text = '✓ Gute Flugbedingungen';
+                type = 'good';
+            }
+            
+            return { text, type };
+        }
+
+        function displayEvaluation(evaluation, lastUpdated) {
+            // Erstelle Evaluierungs-Sektion im Header
+            const headerTop = document.querySelector('.header-top');
+            if (!headerTop) return;
+            
+            // Prüfe ob Evaluierungs-Badge bereits existiert
+            let evalBadge = document.getElementById('evaluation-badge');
+            if (!evalBadge) {
+                evalBadge = document.createElement('div');
+                evalBadge.id = 'evaluation-badge';
+                evalBadge.className = 'evaluation-badge';
+                headerTop.appendChild(evalBadge);
+            }
+            
+            const flyable = evaluation.flyable;
+            const conditions = evaluation.conditions || 'UNKNOWN';
+            const rating = evaluation.rating || 0;
+            const summary = evaluation.summary || '';
+            
+            // Bestimme Badge-Farbe basierend auf Bedingungen
+            let badgeClass = 'evaluation-good';
+            if (conditions === 'EXCELLENT') badgeClass = 'evaluation-excellent';
+            else if (conditions === 'GOOD') badgeClass = 'evaluation-good';
+            else if (conditions === 'MODERATE') badgeClass = 'evaluation-moderate';
+            else if (conditions === 'POOR' || conditions === 'DANGEROUS') badgeClass = 'evaluation-danger';
+            
+            const flyableText = flyable ? '✓ FLUGBAR' : '✗ NICHT FLUGBAR';
+            const ratingStars = '⭐'.repeat(Math.min(rating, 10));
+            
+            evalBadge.innerHTML = `
+                <div class="evaluation-header">
+                    <span class="evaluation-flyable ${flyable ? 'flyable-yes' : 'flyable-no'}">${flyableText}</span>
+                    <span class="evaluation-conditions ${badgeClass}">${conditions}</span>
+                </div>
+                <div class="evaluation-rating">${ratingStars} ${rating}/10</div>
+                <div class="evaluation-summary">${summary}</div>
+                ${lastUpdated ? `<div class="evaluation-updated">Aktualisiert: ${new Date(lastUpdated).toLocaleString('de-CH')}</div>` : ''}
+            `;
+        }
+
+        // Gemeinsame Funktion zur Berechnung der Chart-Breite
+        function calculateChartWidth(hours) {
+            // Mindestens 50px pro Stunde für gute Lesbarkeit
+            const minWidthPerHour = 50;
+            return Math.max(100, hours.length * minWidthPerHour);
+        }
+
+        function createCharts(hours) {
+            const container = document.getElementById('charts-section');
+            container.innerHTML = '';
+            
+            // Berechne gemeinsame Breite für alle Charts
+            const chartWidth = calculateChartWidth(hours);
+
+            // Wind Chart
+            createWindChart(hours, container, chartWidth);
+            
+            // Niederschlag Chart
+            createPrecipitationChart(hours, container, chartWidth);
+            
+            // Thermik Chart
+            createThermikChart(hours, container, chartWidth);
+            
+            // Wolkenbasis Chart
+            createCloudChart(hours, container, chartWidth);
+        }
+
+        function createWindChart(hours, container, chartWidth) {
+            const chartDiv = document.createElement('div');
+            chartDiv.className = 'chart-container';
+            
+            const values = hours.map(h => h.data.wind_speed_10m || 0);
+            const maxValue = Math.max(...values, 1);
+            const avgValue = values.reduce((a, b) => a + b, 0) / values.length;
+            
+            const chartHeight = 60;
+            const containerWidth = chartWidth;
+            
+            // Berechne Positionen für alle Punkte
+            const points = hours.map((h, i) => {
+                const speed = h.data.wind_speed_10m || 0;
+                const x = hours.length > 1 ? (i / (hours.length - 1)) * 100 : 50;
+                const y = chartHeight - ((speed / maxValue) * (chartHeight - 10));
+                
+                let colorClass = 'wind-good';
+                if (speed > 30) colorClass = 'wind-danger';
+                else if (speed > 20) colorClass = 'wind-warning';
+                
+                return {
+                    x: x,
+                    y: y,
+                    speed: speed,
+                    direction: h.data.wind_direction_10m || 0,
+                    colorClass: colorClass,
+                    hour: h.hour,
+                    index: i
+                };
+            });
+            
+            // Erstelle Linien-Segmente zwischen Punkten
+            const lineSegments = [];
+            for (let i = 0; i < points.length - 1; i++) {
+                const p1 = points[i];
+                const p2 = points[i + 1];
+                const dx = p2.x - p1.x;
+                const dy = p2.y - p1.y;
+                // Berechne Länge in Pixeln basierend auf Container-Breite
+                const lengthPx = Math.sqrt((dx * containerWidth / 100) ** 2 + dy ** 2);
+                const angle = Math.atan2(dy, dx * containerWidth / 100) * 180 / Math.PI;
+                
+                lineSegments.push({
+                    left: p1.x + '%',
+                    top: p1.y + 'px',
+                    width: lengthPx + 'px',
+                    angle: angle
+                });
+            }
+            
+            chartDiv.innerHTML = `
+                <div class="chart-header">
+                    <div class="chart-title">💨 Wind</div>
+                    <div class="chart-value">Ø ${avgValue.toFixed(1)} km/h</div>
+                </div>
+                <div class="html-chart-container" style="width: ${containerWidth}px;">
+                    <div class="html-chart-area">
+                        ${lineSegments.map(seg => `
+                            <div class="html-chart-line-segment" 
+                                 style="left: ${seg.left}; top: ${seg.top}; width: ${seg.width}; transform: rotate(${seg.angle}deg);"></div>
+                        `).join('')}
+                        ${points.map(p => `
+                            <div class="html-chart-point ${p.colorClass} chart-highlight" 
+                                 style="left: ${p.x}%; top: ${p.y}px;" 
+                                 data-hour-index="${p.index}"></div>
+                        `).join('')}
+                        ${points.map(p => `
+                            <div class="html-chart-arrow-container" 
+                                 style="left: ${p.x}%; top: ${chartHeight + 15}px;">
+                                <div class="html-chart-arrow ${p.colorClass}" 
+                                     style="transform: rotate(${p.direction}deg);"></div>
+                            </div>
+                        `).join('')}
+                        ${points.map(p => `
+                            <div class="html-chart-label" style="left: ${p.x}%;">${p.hour}:00</div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+            
+            container.appendChild(chartDiv);
+        }
+
+        function createPrecipitationChart(hours, container, chartWidth) {
+            const chartDiv = document.createElement('div');
+            chartDiv.className = 'chart-container';
+            
+            const values = hours.map(h => h.data.precipitation || 0);
+            const maxValue = Math.max(...values, 1);
+            
+            // Verwende übergebene Chart-Breite
+            const containerWidth = chartWidth;
+            
+            chartDiv.innerHTML = `
+                <div class="chart-header">
+                    <div class="chart-title">🌧️ Niederschlag</div>
+                    <div class="chart-value">Max: ${maxValue.toFixed(1)} mm</div>
+                </div>
+                <div class="bar-chart-container" style="width: ${containerWidth}px;">
+                    ${hours.map((h, i) => {
+                        const precip = h.data.precipitation || 0;
+                        const height = (precip / maxValue) * 100;
+                        const hasStorm = h.data.precipitation_probability > 70 && precip > 2;
+                        return `<div class="bar-item ${precip > 0 ? 'has-precipitation' : ''} ${hasStorm ? 'has-storm' : ''}" style="height: ${Math.max(height, 2)}%" data-hour-index="${i}" title="${h.hour}:00 - ${precip.toFixed(1)}mm">
+                            <div style="position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%); font-size: 9px; color: #6B7280; font-weight: 600; white-space: nowrap;">${h.hour}:00</div>
+                        </div>`;
+                    }).join('')}
+                </div>
+            `;
+            
+            container.appendChild(chartDiv);
+        }
+
+        function createThermikChart(hours, container, chartWidth) {
+            const chartDiv = document.createElement('div');
+            chartDiv.className = 'chart-container';
+            
+            // Berechne Steigraten
+            const liftRates = hours.map(h => {
+                const cape = h.data.cape || 0;
+                const sunshine = h.data.sunshine_duration || 0;
+                let liftRate = 0;
+                if (cape > 500) {
+                    liftRate = 2.5 + (cape - 500) / 1000;
+                } else if (cape > 200) {
+                    liftRate = 1.0 + (cape - 200) / 1000;
+                } else if (cape > 0) {
+                    liftRate = cape / 500;
+                }
+                if (sunshine > 0) liftRate *= 1.2;
+                return Math.min(5, Math.max(0, liftRate));
+            });
+            
+            const maxValue = Math.max(...liftRates, 1);
+            const avgValue = liftRates.reduce((a, b) => a + b, 0) / liftRates.length;
+            
+            const chartHeight = 40;
+            const containerWidth = chartWidth;
+            
+            // Berechne Positionen für alle Punkte
+            const points = liftRates.map((rate, i) => {
+                const x = liftRates.length > 1 ? (i / (liftRates.length - 1)) * 100 : 50;
+                const y = chartHeight - (rate / maxValue) * (chartHeight - 10);
+                
+                let colorClass = 'thermik-medium';
+                if (rate > 2) colorClass = 'thermik-high';
+                else if (rate < 1) colorClass = 'thermik-low';
+                
+                return {
+                    x: x,
+                    y: y,
+                    rate: rate,
+                    colorClass: colorClass,
+                    hour: hours[i].hour,
+                    index: i
+                };
+            });
+            
+            // Erstelle Linien-Segmente zwischen Punkten
+            const lineSegments = [];
+            for (let i = 0; i < points.length - 1; i++) {
+                const p1 = points[i];
+                const p2 = points[i + 1];
+                const dx = p2.x - p1.x;
+                const dy = p2.y - p1.y;
+                // Berechne Länge in Pixeln basierend auf Container-Breite
+                const lengthPx = Math.sqrt((dx * containerWidth / 100) ** 2 + dy ** 2);
+                const angle = Math.atan2(dy, dx * containerWidth / 100) * 180 / Math.PI;
+                
+                lineSegments.push({
+                    left: p1.x + '%',
+                    top: p1.y + 'px',
+                    width: lengthPx + 'px',
+                    angle: angle
+                });
+            }
+            
+            chartDiv.innerHTML = `
+                <div class="chart-header">
+                    <div class="chart-title">☀️ Thermik</div>
+                    <div class="chart-value">Ø ${avgValue.toFixed(1)} m/s</div>
+                </div>
+                <div class="html-chart-container" style="width: ${containerWidth}px;">
+                    <div class="html-chart-area" style="height: ${chartHeight}px; margin-bottom: 25px;">
+                        ${lineSegments.map(seg => `
+                            <div class="html-chart-line-segment" 
+                                 style="left: ${seg.left}; top: ${seg.top}; width: ${seg.width}; transform: rotate(${seg.angle}deg); background: #F59E0B;"></div>
+                        `).join('')}
+                        ${points.map(p => `
+                            <div class="html-chart-point ${p.colorClass} chart-highlight" 
+                                 style="left: ${p.x}%; top: ${p.y}px;" 
+                                 data-hour-index="${p.index}"></div>
+                        `).join('')}
+                        ${points.map(p => `
+                            <div class="html-chart-label" style="left: ${p.x}%; top: ${chartHeight + 5}px;">${p.hour}:00</div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+            
+            container.appendChild(chartDiv);
+        }
+
+        function createCloudChart(hours, container, chartWidth) {
+            const chartDiv = document.createElement('div');
+            chartDiv.className = 'chart-container';
+            
+            const cloudBases = hours.map(h => h.data.cloud_base || 0).filter(b => b > 0);
+            const minBase = cloudBases.length > 0 ? Math.min(...cloudBases) : STARTPLATZ_HOEHE - 500;
+            const maxBase = cloudBases.length > 0 ? Math.max(...cloudBases) : STARTPLATZ_HOEHE + 1500;
+            const range = maxBase - minBase || 1000;
+            
+            const values = hours.map(h => {
+                const base = h.data.cloud_base || 0;
+                return base > 0 ? base : STARTPLATZ_HOEHE;
+            });
+            
+            const chartHeight = 40;
+            const containerWidth = chartWidth;
+            const referenceY = chartHeight - ((STARTPLATZ_HOEHE - minBase) / range) * (chartHeight - 10);
+            
+            // Berechne Positionen für alle Punkte
+            const points = values.map((base, i) => {
+                const x = values.length > 1 ? (i / (values.length - 1)) * 100 : 50;
+                const y = chartHeight - ((base - minBase) / range) * (chartHeight - 10);
+                
+                const isDanger = base > 0 && base < STARTPLATZ_HOEHE;
+                const colorClass = isDanger ? 'cloud-danger' : 'cloud-safe';
+                
+                return {
+                    x: x,
+                    y: y,
+                    base: base,
+                    colorClass: colorClass,
+                    hour: hours[i].hour,
+                    index: i
+                };
+            });
+            
+            // Erstelle Linien-Segmente zwischen Punkten
+            const lineSegments = [];
+            for (let i = 0; i < points.length - 1; i++) {
+                const p1 = points[i];
+                const p2 = points[i + 1];
+                const dx = p2.x - p1.x;
+                const dy = p2.y - p1.y;
+                // Berechne Länge in Pixeln basierend auf Container-Breite
+                const lengthPx = Math.sqrt((dx * containerWidth / 100) ** 2 + dy ** 2);
+                const angle = Math.atan2(dy, dx * containerWidth / 100) * 180 / Math.PI;
+                
+                lineSegments.push({
+                    left: p1.x + '%',
+                    top: p1.y + 'px',
+                    width: lengthPx + 'px',
+                    angle: angle
+                });
+            }
+            
+            chartDiv.innerHTML = `
+                <div class="chart-header">
+                    <div class="chart-title">☁️ Wolkenbasis</div>
+                    <div class="chart-value">${minBase.toFixed(0)} - ${maxBase.toFixed(0)} m</div>
+                </div>
+                <div class="html-chart-container" style="width: ${containerWidth}px;">
+                    <div class="html-chart-area" style="height: ${chartHeight}px; margin-bottom: 25px;">
+                        <div class="html-chart-reference-line" style="top: ${referenceY}px;"></div>
+                        ${lineSegments.map(seg => `
+                            <div class="html-chart-line-segment" 
+                                 style="left: ${seg.left}; top: ${seg.top}; width: ${seg.width}; transform: rotate(${seg.angle}deg); background: #2563EB;"></div>
+                        `).join('')}
+                        ${points.map(p => `
+                            <div class="html-chart-point ${p.colorClass} chart-highlight" 
+                                 style="left: ${p.x}%; top: ${p.y}px;" 
+                                 data-hour-index="${p.index}"></div>
+                        `).join('')}
+                        ${points.map(p => `
+                            <div class="html-chart-label" style="left: ${p.x}%; top: ${chartHeight + 5}px;">${p.hour}:00</div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+            
+            container.appendChild(chartDiv);
+        }
+
+        // Hilfsfunktion: Erstellt SVG-Pfeil für Windrichtung
+        function createWindArrow(direction, size = 'large', windClass = 'wind-good') {
+            // Richtung in Grad (0° = Norden, 90° = Osten, 180° = Süden, 270° = Westen)
+            // Pfeil zeigt in die Richtung, aus der der Wind kommt (meteorologische Konvention)
+            const rotation = direction || 0;
+            const sizeValue = size === 'large' ? 50 : 24;
+            const strokeWidth = size === 'large' ? 2.5 : 1.5;
+            
+            return `
+                <div class="wind-arrow-container">
+                    <div class="wind-arrow wind-arrow-${size} ${windClass}" style="transform: rotate(${rotation}deg);">
+                        <svg viewBox="0 0 50 50" xmlns="http://www.w3.org/2000/svg">
+                            <!-- Pfeilspitze zeigt nach oben (Norden = 0°) -->
+                            <path d="M 25 5 L 30 20 L 27 20 L 27 35 L 23 35 L 23 20 L 20 20 Z" 
+                                  stroke-width="${strokeWidth}" 
+                                  stroke-linejoin="round" 
+                                  stroke-linecap="round"/>
+                            <!-- Kreis in der Mitte für bessere Sichtbarkeit -->
+                            <circle cx="25" cy="25" r="3" fill="currentColor"/>
+                        </svg>
+                    </div>
+                    <div class="wind-direction-label">${Math.round(direction)}°</div>
+                </div>
+            `;
+        }
+
+        function createHourCards(hours) {
+            const container = document.getElementById('cards-scroll');
+            container.innerHTML = '';
+            
+            hours.forEach((hour, index) => {
+                const card = document.createElement('div');
+                card.className = 'hour-card';
+                card.dataset.hourIndex = index;
+                
+                const windSpeed = hour.data.wind_speed_10m || 0;
+                const windGusts = hour.data.wind_gusts_10m || 0;
+                const windDirection = hour.data.wind_direction_10m || 0;
+                const precip = hour.data.precipitation || 0;
+                const cloudBase = hour.data.cloud_base || 0;
+                const cloudCover = hour.data.cloud_cover || 0;
+                
+                // Berechne Thermik
+                const cape = hour.data.cape || 0;
+                let liftRate = 0;
+                if (cape > 500) {
+                    liftRate = 2.5 + (cape - 500) / 1000;
+                } else if (cape > 200) {
+                    liftRate = 1.0 + (cape - 200) / 1000;
+                } else if (cape > 0) {
+                    liftRate = cape / 500;
+                }
+                if (hour.data.sunshine_duration > 0) liftRate *= 1.2;
+                liftRate = Math.min(5, Math.max(0, liftRate));
+                
+                // Bestimme Card-Klasse
+                let cardClass = '';
+                if (windSpeed > 30 || precip > 0 || (cloudBase > 0 && cloudBase < STARTPLATZ_HOEHE)) {
+                    cardClass = 'danger';
+                }
+                
+                // Wind-Klasse für Pfeil-Farbe
+                let windClass = 'wind-good';
+                if (windSpeed > 30) windClass = 'wind-danger';
+                else if (windSpeed > 20) windClass = 'wind-warning';
+                
+                card.className = `hour-card ${cardClass}`;
+                
+                card.innerHTML = `
+                    <div class="hour-time">${hour.hour}:00</div>
+                    ${createWindArrow(windDirection, 'large', windClass)}
+                    <div class="hour-metrics">
+                        <div class="metric">
+                            <div class="metric-label">Wind</div>
+                            <div class="metric-value ${windClass}">${windSpeed.toFixed(0)} km/h</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">Böen</div>
+                            <div class="metric-value">${windGusts.toFixed(0)} km/h</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">Thermik</div>
+                            <div class="metric-value">+${liftRate.toFixed(1)} m/s</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">Wolkenbasis</div>
+                            <div class="metric-value">${cloudBase > 0 ? Math.round(cloudBase) + 'm' : 'N/A'}</div>
+                        </div>
+                    </div>
+                `;
+                
+                // Event Listeners
+                card.addEventListener('mouseenter', () => highlightHour(index));
+                card.addEventListener('mouseleave', () => clearHighlight());
+                card.addEventListener('click', () => showDetailOverlay(hour.timestamp, hour.data));
+                
+                container.appendChild(card);
+            });
+        }
+
+        function highlightHour(index) {
+            activeHourIndex = index;
+            document.querySelectorAll('.chart-highlight').forEach(el => {
+                if (el.dataset.hourIndex == index) {
+                    el.classList.add('active');
+                } else {
+                    el.classList.remove('active');
+                }
+            });
+            document.querySelectorAll('.hour-card').forEach((card, i) => {
+                if (i === index) {
+                    card.classList.add('active');
+                } else {
+                    card.classList.remove('active');
+                }
+            });
+        }
+
+        function clearHighlight() {
+            activeHourIndex = null;
+            document.querySelectorAll('.chart-highlight').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.hour-card').forEach(card => card.classList.remove('active'));
+        }
+
+        function showDetailOverlay(timestamp, data) {
+            const overlay = document.getElementById('detail-overlay');
+            const timeDiv = document.getElementById('overlay-time');
+            const detailsDiv = document.getElementById('overlay-details');
+            
+            // Parse Zeitstempel - füge Zeitzone hinzu falls fehlt
+            let dt;
+            if (timestamp.includes('Z') || timestamp.includes('+') || timestamp.includes('-', 10)) {
+                dt = new Date(timestamp);
+            } else {
+                dt = new Date(timestamp + 'Z');
+            }
+            timeDiv.textContent = dt.toLocaleString('de-CH', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+            
+            detailsDiv.innerHTML = `
+                <div class="detail-item">
+                    <strong>Temperatur</strong>
+                    <span>${data.temperature_2m?.toFixed(1) || 'N/A'} °C</span>
+                </div>
+                <div class="detail-item">
+                    <strong>Windgeschwindigkeit</strong>
+                    <span>${data.wind_speed_10m?.toFixed(1) || 'N/A'} km/h</span>
+                </div>
+                <div class="detail-item">
+                    <strong>Windrichtung</strong>
+                    <span>${data.wind_direction_10m?.toFixed(0) || 'N/A'}°</span>
+                </div>
+                <div class="detail-item">
+                    <strong>Böen</strong>
+                    <span>${data.wind_gusts_10m?.toFixed(1) || 'N/A'} km/h</span>
+                </div>
+                <div class="detail-item">
+                    <strong>Wolkenbasis</strong>
+                    <span>${data.cloud_base?.toFixed(0) || 'N/A'} m</span>
+                </div>
+                <div class="detail-item">
+                    <strong>Bewölkung</strong>
+                    <span>${data.cloud_cover?.toFixed(0) || 'N/A'} %</span>
+                </div>
+                <div class="detail-item">
+                    <strong>Niederschlag</strong>
+                    <span>${data.precipitation?.toFixed(1) || '0.0'} mm</span>
+                </div>
+                <div class="detail-item">
+                    <strong>Niederschlagswahrscheinlichkeit</strong>
+                    <span>${data.precipitation_probability?.toFixed(0) || '0'} %</span>
+                </div>
+                <div class="detail-item">
+                    <strong>CAPE</strong>
+                    <span>${data.cape?.toFixed(0) || '0'} J/kg</span>
+                </div>
+                <div class="detail-item">
+                    <strong>Sonnenscheindauer</strong>
+                    <span>${data.sunshine_duration ? (data.sunshine_duration / 3600).toFixed(1) : '0.0'} h</span>
+                </div>
+            `;
+            
+            overlay.classList.add('active');
+        }
+
+        function closeOverlay() {
+            document.getElementById('detail-overlay').classList.remove('active');
+        }
+
+        // Overlay schließen bei Klick außerhalb
+        document.getElementById('detail-overlay').addEventListener('click', (e) => {
+            if (e.target.id === 'detail-overlay') {
+                closeOverlay();
+            }
+        });
+
+        // ESC-Taste zum Schließen
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeOverlay();
+            }
+        });
+
+        // Lade Daten beim Start
+        loadWeatherData();
+    </script>
+</body>
+</html>
