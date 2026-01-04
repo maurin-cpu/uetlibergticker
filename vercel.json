@@ -2,27 +2,27 @@
   "rewrites": [
     {
       "source": "/api/cron",
-      "destination": "/api/cron.py"
+      "destination": "/api/cron"
     },
     {
       "source": "/api/weather",
-      "destination": "/api/index.py"
+      "destination": "/api/index"
     },
     {
       "source": "/api/evaluation",
-      "destination": "/api/index.py"
+      "destination": "/api/index"
     },
     {
       "source": "/api/email-config",
-      "destination": "/api/index.py"
+      "destination": "/api/index"
     },
     {
       "source": "/api/test-email",
-      "destination": "/api/index.py"
+      "destination": "/api/index"
     },
     {
       "source": "/(.*)",
-      "destination": "/api/index.py"
+      "destination": "/api/index"
     }
   ],
   "crons": [
