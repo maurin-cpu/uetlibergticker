@@ -23,14 +23,32 @@ try:
 except ImportError:
     EmailNotifier = None
 
-app = Flask(__name__)
+# Stelle sicher, dass Flask das templates-Verzeichnis findet
+# Für Vercel: Verwende absoluten Pfad zum Projekt-Root
+template_dir = Path(__file__).parent / 'templates'
+if not template_dir.exists():
+    # Fallback: Falls templates/ nicht existiert, verwende aktuelles Verzeichnis
+    template_dir = Path(__file__).parent
+
+app = Flask(__name__, template_folder=str(template_dir))
 
 
 def load_weather_data():
     """Lädt Wetterdaten aus JSON-Datei."""
-    weather_file = Path("data/wetterdaten.json")
-    if not weather_file.exists():
-        raise FileNotFoundError(f"Wetterdaten nicht gefunden: {weather_file}")
+    # Für Vercel: Verwende /tmp falls verfügbar, sonst data/
+    # Prüfe beide möglichen Pfade
+    weather_file = None
+    if os.path.exists('/tmp') and Path('/tmp/wetterdaten.json').exists():
+        weather_file = Path('/tmp/wetterdaten.json')
+    elif Path("data/wetterdaten.json").exists():
+        weather_file = Path("data/wetterdaten.json")
+    
+    if not weather_file or not weather_file.exists():
+        raise FileNotFoundError(
+            f"Wetterdaten nicht gefunden. "
+            f"Bitte warten Sie, bis der Cron-Job die Daten erstellt hat, "
+            f"oder führen Sie manuell 'python fetch_weather.py' aus."
+        )
     
     with open(weather_file, 'r', encoding='utf-8') as f:
         data = json.load(f)
@@ -136,10 +154,15 @@ def format_data_for_charts(hourly_data):
 
 def get_evaluation_data():
     """Lädt LLM-Auswertung aus evaluations.json."""
-    evaluations_file = Path("data/evaluations.json")
+    # Für Vercel: Verwende /tmp falls verfügbar, sonst data/
+    evaluations_file = None
+    if os.path.exists('/tmp') and Path('/tmp/evaluations.json').exists():
+        evaluations_file = Path('/tmp/evaluations.json')
+    elif Path("data/evaluations.json").exists():
+        evaluations_file = Path("data/evaluations.json")
     
-    if not evaluations_file.exists():
-        print(f"Warnung: {evaluations_file} nicht gefunden")
+    if not evaluations_file or not evaluations_file.exists():
+        print(f"Warnung: evaluations.json nicht gefunden")
         return {}
     
     try:
@@ -212,6 +235,33 @@ def api_weather():
         }), 500
 
 
+@app.route('/api/weather/raw')
+def api_weather_raw():
+    """API-Endpoint für rohe Wetterdaten (kompatibel mit direktem JSON-Zugriff)."""
+    try:
+        # Lade die rohen JSON-Daten direkt
+        # Für Vercel: Verwende /tmp falls verfügbar, sonst data/
+        weather_file = None
+        if os.path.exists('/tmp') and Path('/tmp/wetterdaten.json').exists():
+            weather_file = Path('/tmp/wetterdaten.json')
+        elif Path("data/wetterdaten.json").exists():
+            weather_file = Path("data/wetterdaten.json")
+        
+        if not weather_file or not weather_file.exists():
+            return jsonify({
+                'error': 'Wetterdaten nicht gefunden. Bitte warten Sie, bis der Cron-Job die Daten erstellt hat.'
+            }), 404
+        
+        with open(weather_file, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        
+        return jsonify(data)
+    except Exception as e:
+        return jsonify({
+            'error': str(e)
+        }), 500
+
+
 @app.route('/api/evaluation')
 def api_evaluation():
     """API-Endpoint für LLM-Auswertung."""
@@ -232,6 +282,37 @@ def api_evaluation():
             'success': False,
             'error': str(e)
         }), 500
+
+
+@app.route('/api/evaluation/raw')
+def api_evaluation_raw():
+    """API-Endpoint für rohe Evaluierungsdaten (kompatibel mit direktem JSON-Zugriff)."""
+    try:
+        # Lade die rohen JSON-Daten direkt
+        # Für Vercel: Verwende /tmp falls verfügbar, sonst data/
+        evaluations_file = None
+        if os.path.exists('/tmp') and Path('/tmp/evaluations.json').exists():
+            evaluations_file = Path('/tmp/evaluations.json')
+        elif Path("data/evaluations.json").exists():
+            evaluations_file = Path("data/evaluations.json")
+        
+        if not evaluations_file or not evaluations_file.exists():
+            # Gebe leeres Objekt zurück statt Fehler (Evaluierungen sind optional)
+            return jsonify({
+                'evaluations': [],
+                'last_updated': None
+            })
+        
+        with open(evaluations_file, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        
+        return jsonify(data)
+    except Exception as e:
+        # Gebe leeres Objekt zurück statt Fehler (Evaluierungen sind optional)
+        return jsonify({
+            'evaluations': [],
+            'last_updated': None
+        })
 
 
 @app.route('/api/email-config', methods=['GET'])
