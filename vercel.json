@@ -4,12 +4,36 @@
     {
       "src": "api/cron.py",
       "use": "@vercel/python"
+    },
+    {
+      "src": "api/index.py",
+      "use": "@vercel/python"
     }
   ],
   "routes": [
     {
       "src": "/api/cron",
       "dest": "api/cron.py"
+    },
+    {
+      "src": "/api/weather",
+      "dest": "api/index.py"
+    },
+    {
+      "src": "/api/evaluation",
+      "dest": "api/index.py"
+    },
+    {
+      "src": "/api/email-config",
+      "dest": "api/index.py"
+    },
+    {
+      "src": "/api/test-email",
+      "dest": "api/index.py"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "api/index.py"
     }
   ],
   "crons": [
