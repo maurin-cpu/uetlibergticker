@@ -569,6 +569,81 @@ def api_test_email():
             'error': f'Fehler beim Senden der Test-E-Mail: {str(e)}'
         }), 500
 
+@app.route('/api/cron', methods=['GET', 'POST'])
+def api_cron():
+    """API-Endpoint für Cron-Job: Wetter abrufen + LLM-Analyse + Email."""
+    import logging
+    from datetime import datetime
+    logger = logging.getLogger(__name__)
+    
+    results = {
+        'success': False,
+        'timestamp': datetime.now().isoformat(),
+        'steps': {}
+    }
+    
+    try:
+        # Schritt 1: Wetterdaten abrufen
+        logger.info("CRON: Starte Wetterdaten-Abruf...")
+        if fetch_weather_for_location:
+            weather_data = fetch_weather_for_location(save_to_file=True, output_path='/tmp/wetterdaten.json')
+            if weather_data:
+                results['steps']['weather'] = {'success': True, 'message': 'Wetterdaten abgerufen'}
+                logger.info("CRON: Wetterdaten erfolgreich abgerufen")
+            else:
+                results['steps']['weather'] = {'success': False, 'message': 'Keine Daten'}
+        else:
+            results['steps']['weather'] = {'success': False, 'message': 'fetch_weather_for_location nicht verfügbar'}
+        
+        # Schritt 2: LLM-Analyse
+        logger.info("CRON: Starte LLM-Analyse...")
+        try:
+            from location_evaluator import LocationEvaluator
+            evaluator = LocationEvaluator(weather_json_path='/tmp/wetterdaten.json')
+            analysis_results = evaluator.analyze()
+            if analysis_results:
+                results['steps']['llm'] = {'success': True, 'message': f'{len(analysis_results)} Tage analysiert'}
+                logger.info(f"CRON: LLM-Analyse abgeschlossen für {len(analysis_results)} Tage")
+            else:
+                results['steps']['llm'] = {'success': False, 'message': 'Keine Ergebnisse'}
+        except Exception as e:
+            results['steps']['llm'] = {'success': False, 'message': str(e)}
+            logger.error(f"CRON: LLM-Analyse fehlgeschlagen: {e}")
+        
+        # Schritt 3: E-Mail senden
+        logger.info("CRON: Sende E-Mail...")
+        if EmailNotifier:
+            try:
+                notifier = EmailNotifier()
+                if notifier.enabled:
+                    evaluations = get_evaluation_data()
+                    if evaluations:
+                        sorted_dates = sorted(evaluations.keys(), reverse=True)
+                        latest = evaluations[sorted_dates[0]]
+                        success, error = notifier.send_alert(latest, force_send=True)
+                        results['steps']['email'] = {'success': success, 'message': error or 'E-Mail gesendet'}
+                    else:
+                        results['steps']['email'] = {'success': False, 'message': 'Keine Evaluierungen'}
+                else:
+                    results['steps']['email'] = {'success': False, 'message': 'E-Mail deaktiviert'}
+            except Exception as e:
+                results['steps']['email'] = {'success': False, 'message': str(e)}
+        else:
+            results['steps']['email'] = {'success': False, 'message': 'EmailNotifier nicht verfügbar'}
+        
+        results['success'] = all(step.get('success', False) for step in results['steps'].values())
+        return jsonify(results)
+        
+    except Exception as e:
+        logger.error(f"CRON: Fehler: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/auto-email', methods=['GET', 'POST'])
+def api_auto_email():
+    """API-Endpoint für automatische E-Mail (ruft intern /api/cron auf)."""
+    return api_cron()
+
 
 if __name__ == '__main__':
     # Prüfe ob Wetterdaten vorhanden sind
