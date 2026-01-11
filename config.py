@@ -13,7 +13,7 @@ LOCATION = {
     "longitude": 8.5008,
     "typ": "Startplatz",
     "fluggebiet": "Uetliberg",
-    "windrichtung": "NNO-O",
+    "windrichtung": "N-O",
     "bemerkung": "Benötigt gewisse Windstärke da man hier Soaren muss, ab 15km/h kann man Erfahrungsgemäss am Uetliberg gut fliegen ab 20km/h hat man sehr gute windstärke, wenn dann Thermikbedingungen gut sind hat man gute bedingungen, der Wind ist grundsätzlich aber ab 30km/h zu stark, dies sind jedoch keine Grenzwerte sondern müssen immer beurteilt werden"
 }
 

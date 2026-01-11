@@ -239,10 +239,13 @@ def format_data_for_charts(hourly_data):
             
             # Wolkenbasis-Daten
             cloud_base = data.get('cloud_base')
-            if cloud_base is not None:
+            cloud_cover = data.get('cloud_cover')
+            
+            if cloud_base is not None or cloud_cover is not None:
                 chart_data['cloudbase'].append({
                     'time': time_str,
-                    'height': cloud_base
+                    'height': cloud_base,
+                    'cover': cloud_cover
                 })
         except Exception:
             continue

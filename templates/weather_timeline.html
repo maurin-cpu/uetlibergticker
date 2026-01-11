@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="de">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -313,7 +314,8 @@
             font-weight: 500;
         }
 
-        .axis path, .axis line {
+        .axis path,
+        .axis line {
             stroke: var(--color-border);
         }
 
@@ -351,7 +353,9 @@
         }
 
         @keyframes spin {
-            to { transform: rotate(360deg); }
+            to {
+                transform: rotate(360deg);
+            }
         }
 
         @media (max-width: 1024px) {
@@ -361,6 +365,7 @@
         }
     </style>
 </head>
+
 <body>
     <div class="container">
         <div class="header">
@@ -399,7 +404,7 @@
                     <span style="color: var(--color-text-light); font-size: 14px;">/10</span>
                 </div>
             </div>
-            
+
             <div class="rating-section">
                 <div style="display: flex; align-items: center; gap: 12px;">
                     <span style="font-weight: 600; font-size: 13px; color: var(--color-text-light);">KI-Konfidenz</span>
@@ -429,7 +434,8 @@
                 </div>
                 <div class="detail-section" style="grid-column: 1 / -1;">
                     <div class="detail-title">💡 Piloten-Empfehlung</div>
-                    <div class="detail-content" id="recommendation" style="font-size: 14px; color: var(--color-text); font-weight: 500;"></div>
+                    <div class="detail-content" id="recommendation"
+                        style="font-size: 14px; color: var(--color-text); font-weight: 500;"></div>
                 </div>
             </div>
         </div>
@@ -470,32 +476,32 @@
         // Parst erlaubte Windrichtung (z.B. "NNO-O") in Grad-Bereich
         function parseAllowedWindDirection(allowedDir) {
             if (!allowedDir) return null;
-            
+
             const parts = allowedDir.split('-');
             if (parts.length !== 2) return null;
-            
+
             const startDir = directionToDegrees(parts[0].trim());
             const endDir = directionToDegrees(parts[1].trim());
-            
+
             if (startDir === null || endDir === null) return null;
-            
+
             // Handle wrap-around (z.B. wenn Bereich über 360° geht)
             if (startDir > endDir) {
                 // Bereich geht über 0° hinweg (z.B. NNW-N)
                 return { start: startDir, end: endDir + 360, wraps: true };
             }
-            
+
             return { start: startDir, end: endDir, wraps: false };
         }
 
         // Prüft, ob Windrichtung innerhalb des erlaubten Bereichs liegt
         function isWindDirectionAllowed(windDirection, allowedDirectionRange) {
             if (!allowedDirectionRange) return true; // Wenn keine Info, erlaube alles
-            
+
             // wind_direction_10m aus der API ist die Herkunftsrichtung (woher Wind kommt)
             // Prüfe direkt, ob die Windrichtung im erlaubten Bereich liegt
             const fromDirection = windDirection;
-            
+
             if (allowedDirectionRange.wraps) {
                 // Bereich geht über 0° hinweg (z.B. NNW-N)
                 return fromDirection >= allowedDirectionRange.start || fromDirection <= (allowedDirectionRange.end % 360);
@@ -509,7 +515,7 @@
             try {
                 const weatherResponse = await fetch('/api/weather');
                 const weatherResult = await weatherResponse.json();
-                
+
                 if (weatherResult.success) {
                     weatherData = weatherResult;
                     availableDates = weatherResult.dates || [];
@@ -525,7 +531,7 @@
 
                 const evalResponse = await fetch('/api/evaluation');
                 const evalResult = await evalResponse.json();
-                
+
                 if (evalResult.success) {
                     evaluationData = evalResult.evaluations || {};
                     if (currentDate && evaluationData[currentDate]) {
@@ -542,12 +548,12 @@
         function setupDaySelector() {
             const selector = document.getElementById('day-selector');
             const select = document.getElementById('day-select');
-            
+
             if (availableDates.length === 0) return;
-            
+
             selector.style.display = 'flex';
             select.innerHTML = '';
-            
+
             availableDates.forEach((date, index) => {
                 const option = document.createElement('option');
                 const dateObj = new Date(date + 'T00:00:00');
@@ -557,8 +563,8 @@
                 if (index === 0) option.selected = true;
                 select.appendChild(option);
             });
-            
-            select.addEventListener('change', function() {
+
+            select.addEventListener('change', function () {
                 currentDate = this.value;
                 updateChartsForDate(currentDate);
                 if (evaluationData && evaluationData[currentDate]) {
@@ -576,7 +582,7 @@
 
         function updateLocationInfo(data) {
             const hours = data.flight_hours;
-            document.getElementById('location-info').textContent = 
+            document.getElementById('location-info').textContent =
                 `${data.location.name} • Startrichtung: ${data.location.windrichtung} • Flugfenster: ${hours.start}-${hours.end} Uhr`;
         }
 
@@ -591,15 +597,15 @@
             const condBadge = document.getElementById('conditions-badge');
             condBadge.textContent = eval.conditions;
             condBadge.className = 'conditions-badge conditions-' + eval.conditions.toLowerCase();
-            
+
             // Setze Farbe des Condition Badges basierend auf Status
             const colors = { EXCELLENT: '#10B981', GOOD: '#34D399', MODERATE: '#F59E0B', POOR: '#F87171', DANGEROUS: '#EF4444' };
-            condBadge.style.backgroundColor = `rgba(${parseInt(colors[eval.conditions].slice(1,3), 16)}, ${parseInt(colors[eval.conditions].slice(3,5), 16)}, ${parseInt(colors[eval.conditions].slice(5,7), 16)}, 0.2)`;
+            condBadge.style.backgroundColor = `rgba(${parseInt(colors[eval.conditions].slice(1, 3), 16)}, ${parseInt(colors[eval.conditions].slice(3, 5), 16)}, ${parseInt(colors[eval.conditions].slice(5, 7), 16)}, 0.2)`;
             condBadge.style.color = colors[eval.conditions];
-            condBadge.style.border = `1px solid rgba(${parseInt(colors[eval.conditions].slice(1,3), 16)}, ${parseInt(colors[eval.conditions].slice(3,5), 16)}, ${parseInt(colors[eval.conditions].slice(5,7), 16)}, 0.3)`;
+            condBadge.style.border = `1px solid rgba(${parseInt(colors[eval.conditions].slice(1, 3), 16)}, ${parseInt(colors[eval.conditions].slice(3, 5), 16)}, ${parseInt(colors[eval.conditions].slice(5, 7), 16)}, 0.3)`;
 
             document.getElementById('rating-value').textContent = eval.rating;
-            document.getElementById('rating-stars').textContent = '★'.repeat(Math.round(eval.rating/2)) + '☆'.repeat(5 - Math.round(eval.rating/2));
+            document.getElementById('rating-stars').textContent = '★'.repeat(Math.round(eval.rating / 2)) + '☆'.repeat(5 - Math.round(eval.rating / 2));
             document.getElementById('confidence-value').textContent = eval.confidence + '/10';
             document.getElementById('confidence-fill').style.width = (eval.confidence * 10) + '%';
 
@@ -613,7 +619,7 @@
         function drawUnifiedMeteogram(dayData) {
             const container = d3.select('#unified-meteogram');
             container.selectAll('*').remove();
-            
+
             const rect = container.node().getBoundingClientRect();
             const width = rect.width - margin.left - margin.right;
             const height = rect.height - margin.top - margin.bottom;
@@ -624,7 +630,7 @@
 
             // Gradients & Defs
             const defs = svg.append('defs');
-            
+
             const windGradient = defs.append('linearGradient').attr('id', 'wind-grad').attr('x1', '0').attr('y1', '0').attr('x2', '0').attr('y2', '1');
             windGradient.append('stop').attr('offset', '0%').attr('stop-color', '#6366F1').attr('stop-opacity', '0.4');
             windGradient.append('stop').attr('offset', '100%').attr('stop-color', '#6366F1').attr('stop-opacity', '0');
@@ -698,7 +704,7 @@
                 const rotation = (d.direction + 180) % 360;
                 const x = xScale(times[i]);
                 const y = yWind(d.speed) - 10;
-                
+
                 arrowGroup.append('line')
                     .attr('x1', x)
                     .attr('y1', y + 5)
@@ -738,16 +744,47 @@
                 .attr('rx', 2);
 
             // 3. Cloud Lane
-            const hasCloudData = dayData.cloudbase && dayData.cloudbase.length > 0;
-            
-            if (hasCloudData) {
-                const minCloud = d3.min(dayData.cloudbase, d => d.height);
-                const maxCloud = d3.max(dayData.cloudbase, d => d.height);
-                const yCloud = d3.scaleLinear().domain([Math.max(0, minCloud - 500), maxCloud + 500]).range([lanes.cloud.y + lanes.cloud.h, lanes.cloud.y]);
+            // Check availability
+            const hasCloudBase = dayData.cloudbase && dayData.cloudbase.some(d => d.height !== null && d.height !== undefined);
+            const hasCloudCover = dayData.cloudbase && dayData.cloudbase.some(d => d.cover !== null && d.cover !== undefined);
 
-                const cloudLine = d3.line()
+            // Setup Y-Axis for Cloud Base (Meters)
+            // Default domain if no base data: 0 to 3000m (typical flight range)
+            let minCloud = hasCloudBase ? d3.min(dayData.cloudbase, d => d.height) : 0;
+            let maxCloud = hasCloudBase ? d3.max(dayData.cloudbase, d => d.height) : 3000;
+            const yCloudBase = d3.scaleLinear()
+                .domain([Math.max(0, minCloud - 500), maxCloud + 500])
+                .range([lanes.cloud.y + lanes.cloud.h, lanes.cloud.y]);
+
+            // Setup Y-Axis for Cloud Cover (Percentage)
+            // Mapped to the same lane height
+            const yCloudCover = d3.scaleLinear()
+                .domain([0, 100])
+                .range([lanes.cloud.y + lanes.cloud.h, lanes.cloud.y]);
+
+            // Draw Cloud Cover (Area/Bars)
+            if (hasCloudCover) {
+                const coverArea = d3.area()
                     .x((d, i) => xScale(times[i]))
-                    .y(d => yCloud(d.height))
+                    .y0(lanes.cloud.y + lanes.cloud.h)
+                    .y1(d => yCloudCover(d.cover || 0))
+                    .curve(d3.curveMonotoneX);
+
+                g.append('path')
+                    .datum(dayData.cloudbase)
+                    .attr('fill', '#94A3B8')
+                    .attr('fill-opacity', 0.2)
+                    .attr('d', coverArea);
+
+                g.append('text').attr('class', 'lane-label').attr('x', width - 10).attr('y', lanes.cloud.y + 15).attr('text-anchor', 'end').text('Bewölkung %');
+            }
+
+            // Draw Cloud Base (Line)
+            if (hasCloudBase) {
+                const cloudLine = d3.line()
+                    .defined(d => d.height !== null)
+                    .x((d, i) => xScale(times[i]))
+                    .y(d => yCloudBase(d.height))
                     .curve(d3.curveMonotoneX);
 
                 g.append('path')
@@ -757,7 +794,21 @@
                     .attr('stroke-width', 2)
                     .attr('stroke-dasharray', '4,4')
                     .attr('d', cloudLine);
-            } else {
+
+                // Add dots for data points
+                g.selectAll('.cloud-dot')
+                    .data(dayData.cloudbase.filter(d => d.height !== null))
+                    .enter().append('circle')
+                    .attr('cx', (d, i) => xScale(new Date(d.time)))
+                    // Note: accessing time directly from data object might need parsing if not aligned with 'times' array index
+                    // Safe approach: use index if mapped 1:1, but filtered data breaks index.
+                    // Better: use xScale with parsed date.
+                    .attr('cy', d => yCloudBase(d.height))
+                    .attr('r', 2)
+                    .attr('fill', '#BAE6FD');
+            }
+
+            if (!hasCloudBase && !hasCloudCover) {
                 g.append('text')
                     .attr('x', width / 2)
                     .attr('y', lanes.cloud.y + lanes.cloud.h / 2)
@@ -765,7 +816,7 @@
                     .attr('fill', 'var(--color-text-light)')
                     .style('font-size', '13px')
                     .style('font-style', 'italic')
-                    .text('Keine Wolkendaten verfügbar (Modell-Limitierung)');
+                    .text('Keine Wolkendaten verfügbar');
             }
 
             // Achsen & Labels
@@ -784,7 +835,8 @@
                 { color: 'url(#wind-grad)', label: 'Böen' },
                 { color: 'url(#thermik-grad)', label: 'CAPE' },
                 { color: '#38BDF8', label: 'Regen' },
-                { color: '#BAE6FD', label: 'Wolken' }
+                { color: '#BAE6FD', label: 'Basis' },
+                { color: '#94A3B8', label: 'Bewölkung' }
             ];
 
             legendItems.forEach((item, i) => {
@@ -798,15 +850,15 @@
 
             const overlay = g.append('rect').attr('width', width).attr('height', height).attr('fill', 'none').attr('pointer-events', 'all');
 
-            overlay.on('mousemove', function(event) {
+            overlay.on('mousemove', function (event) {
                 const [mx] = d3.pointer(event);
                 const date = xScale.invert(mx);
                 const bisect = d3.bisector(d => d).left;
                 const idx = bisect(times, date);
-                const d = dayData.wind[idx] || dayData.wind[idx-1];
-                const t = dayData.thermik[idx] || dayData.thermik[idx-1];
-                const c = dayData.cloudbase[idx] || dayData.cloudbase[idx-1];
-                const p = dayData.precipitation[idx] || dayData.precipitation[idx-1];
+                const d = dayData.wind[idx] || dayData.wind[idx - 1];
+                const t = dayData.thermik[idx] || dayData.thermik[idx - 1];
+                const c = dayData.cloudbase[idx] || dayData.cloudbase[idx - 1];
+                const p = dayData.precipitation[idx] || dayData.precipitation[idx - 1];
 
                 if (!d) return;
 
@@ -840,16 +892,16 @@
         }
 
         // Test-E-Mail Button Handler
-        document.getElementById('test-email-btn').addEventListener('click', async function() {
+        document.getElementById('test-email-btn').addEventListener('click', async function () {
             const btn = this;
             const messageDiv = document.getElementById('test-email-message');
-            
+
             // Button deaktivieren
             btn.disabled = true;
             btn.textContent = '📧 Sende...';
             messageDiv.className = 'test-email-message';
             messageDiv.textContent = '';
-            
+
             try {
                 const response = await fetch('/api/test-email', {
                     method: 'POST',
@@ -857,9 +909,9 @@
                         'Content-Type': 'application/json'
                     }
                 });
-                
+
                 const data = await response.json();
-                
+
                 if (data.success) {
                     messageDiv.className = 'test-email-message success';
                     messageDiv.textContent = '✅ ' + data.message;
@@ -880,5 +932,5 @@
         loadData();
     </script>
 </body>
-</html>
 
+</html>
