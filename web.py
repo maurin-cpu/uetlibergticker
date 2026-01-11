@@ -23,6 +23,16 @@ try:
 except ImportError:
     EmailNotifier = None
 
+try:
+    from fetch_weather import fetch_weather_for_location
+except ImportError:
+    fetch_weather_for_location = None
+
+# Globaler Cache für Wetterdaten (für Vercel Instanzen)
+CACHED_WEATHER_DATA = None
+LAST_FETCH_TIME = 0
+CACHE_DURATION = 300  # 5 Minuten Cache
+
 # Stelle sicher, dass Flask das templates-Verzeichnis findet
 # Für Vercel: Verwende absoluten Pfad zum Projekt-Root
 template_dir = Path(__file__).parent / 'templates'
@@ -34,96 +44,92 @@ app = Flask(__name__, template_folder=str(template_dir))
 
 
 def load_weather_data():
-    """Lädt Wetterdaten aus JSON-Datei."""
+    """
+    Lädt Wetterdaten.
+    Reihenfolge:
+    1. In-Memory Cache (weniger als 5 Min alt)
+    2. JSON-Datei (/tmp oder data/)
+    3. Live-Abruf (Fallback falls keine Datei)
+    """
+    global CACHED_WEATHER_DATA, LAST_FETCH_TIME
     import logging
+    import time
     logger = logging.getLogger(__name__)
     
-    # Für Vercel: Verwende /tmp falls verfügbar, sonst data/
-    # Prüfe beide möglichen Pfade
+    current_time = time.time()
+    
+    # 1. Prüfe In-Memory Cache
+    if CACHED_WEATHER_DATA and (current_time - LAST_FETCH_TIME < CACHE_DURATION):
+        logger.info("Verwende gecachte Wetterdaten (In-Memory)")
+        return CACHED_WEATHER_DATA
+    
+    # 2. Versuche Datei zu laden
     weather_file = None
-    checked_paths = []
     
     # Prüfe zuerst /tmp (für Vercel)
     if os.path.exists('/tmp'):
         tmp_path = Path('/tmp/wetterdaten.json')
-        checked_paths.append(str(tmp_path))
         if tmp_path.exists():
             weather_file = tmp_path
-            logger.info(f"Wetterdaten gefunden in: {tmp_path}")
     
     # Prüfe dann data/ (für lokale Entwicklung)
     if not weather_file:
         data_path = Path("data/wetterdaten.json")
-        checked_paths.append(str(data_path))
         if data_path.exists():
             weather_file = data_path
-            logger.info(f"Wetterdaten gefunden in: {data_path}")
+            
+    if weather_file and weather_file.exists():
+        try:
+            logger.info(f"Lade Wetterdaten aus: {weather_file}")
+            with open(weather_file, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                
+            # Extrahiere Uetliberg Daten
+            found_location = None
+            for key in data.keys():
+                if 'uetliberg' in key.lower() or 'balderen' in key.lower():
+                    found_location = key
+                    break
+            
+            if found_location:
+                # Update Cache
+                CACHED_WEATHER_DATA = data[found_location]
+                LAST_FETCH_TIME = current_time
+                return CACHED_WEATHER_DATA
+                
+        except Exception as e:
+            logger.error(f"Fehler beim Lesen der Datei {weather_file}: {e}")
+            # Fallback zu Live-Fetch bei defekter Datei
     
-    if not weather_file or not weather_file.exists():
-        error_msg = (
-            f"Wetterdaten nicht gefunden. "
-            f"Geprüfte Pfade: {', '.join(checked_paths)}. "
-            f"Bitte warten Sie, bis der Cron-Job die Daten erstellt hat, "
-            f"oder rufen Sie /api/cron auf, um Daten zu generieren."
-        )
-        logger.error(error_msg)
-        raise FileNotFoundError(error_msg)
+    # 3. Fallback: Live Abruf wenn keine Datei da ist oder sie fehlerhaft war
+    logger.info("Keine lokalen Daten gefunden - Führe Live-Abruf durch...")
     
-    try:
-        logger.info(f"Lade Wetterdaten aus: {weather_file}")
-        with open(weather_file, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-        
-        if not data:
-            error_msg = (
-                f"Wetterdaten-Datei ist leer: {weather_file}. "
-                f"Rufe /api/cron auf, um neue Daten zu generieren."
-            )
-            logger.error(error_msg)
-            raise ValueError(error_msg)
-        
-        # Suche Uetliberg Eintrag
-        found_location = None
-        for key in data.keys():
-            if 'uetliberg' in key.lower() or 'balderen' in key.lower():
-                found_location = key
-                logger.info(f"Uetliberg-Daten gefunden unter Key: {key}")
-                break
-        
-        if not found_location:
-            available_keys = ', '.join(data.keys()) if data else 'keine'
-            error_msg = (
-                f"Keine Wetterdaten für Uetliberg gefunden. "
-                f"Verfügbare Keys in Datei: {available_keys}. "
-                f"Erwarteter Key sollte 'Uetliberg' oder 'Balderen' enthalten."
-            )
-            logger.error(error_msg)
-            raise ValueError(error_msg)
-        
-        return data[found_location]
-        
-    except json.JSONDecodeError as e:
-        error_msg = (
-            f"FEHLER: wetterdaten.json ist kein gültiges JSON. "
-            f"Datei: {weather_file}, Fehler: {str(e)}. "
-            f"Die Datei könnte beschädigt sein. Rufe /api/cron auf, um sie neu zu generieren."
-        )
-        logger.error(error_msg, exc_info=True)
-        raise ValueError(error_msg) from e
-    except PermissionError as e:
-        error_msg = (
-            f"FEHLER: Keine Berechtigung zum Lesen von wetterdaten.json. "
-            f"Datei: {weather_file}, Fehler: {str(e)}"
-        )
-        logger.error(error_msg, exc_info=True)
-        raise PermissionError(error_msg) from e
-    except Exception as e:
-        error_msg = (
-            f"FEHLER: Unerwarteter Fehler beim Laden der Wetterdaten. "
-            f"Datei: {weather_file}, Fehler: {str(e)}"
-        )
-        logger.error(error_msg, exc_info=True)
-        raise
+    if fetch_weather_for_location:
+        try:
+            # Live Abruf (nicht in Datei speichern, um Vercel Filesystem Probleme zu vermeiden)
+            fresh_data = fetch_weather_for_location(save_to_file=False)
+            
+            if fresh_data:
+                # Extrahiere Uetliberg Daten
+                found_location = None
+                for key in fresh_data.keys():
+                    if 'uetliberg' in key.lower() or 'balderen' in key.lower():
+                        found_location = key
+                        break
+                
+                if found_location:
+                    # Update Cache
+                    CACHED_WEATHER_DATA = fresh_data[found_location]
+                    LAST_FETCH_TIME = current_time
+                    logger.info("Live-Daten erfolgreich abgerufen und gecacht")
+                    return CACHED_WEATHER_DATA
+        except Exception as e:
+            logger.error(f"Live-Abruf fehlgeschlagen: {e}")
+            
+    # Wenn alles fehlschlägt
+    error_msg = "Wetterdaten konnten weder aus Datei geladen noch live abgerufen werden."
+    logger.error(error_msg)
+    raise ValueError(error_msg)
 
 
 def filter_flight_hours(hourly_data):

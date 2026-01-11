@@ -1,0 +1,11 @@
+{
+    "name": "uetliberg-ticker",
+    "version": "1.0.0",
+    "description": "Uetliberg Ticker",
+    "scripts": {
+        "dev": "python web.py",
+        "start": "python web.py",
+        "fetch": "python fetch_weather.py",
+        "eval": "python location_evaluator.py"
+    }
+}
