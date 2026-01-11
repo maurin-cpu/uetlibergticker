@@ -22,7 +22,7 @@ LOCATION = {
 # ============================================================================
 
 API_URL = "https://api.open-meteo.com/v1/forecast"
-API_MODEL = "meteoswiss_icon_ch1"
+API_MODEL = "best_match"
 API_TIMEOUT = 30
 FORECAST_DAYS = 3
 TIMEZONE = "Europe/Zurich"
