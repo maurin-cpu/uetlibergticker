@@ -61,22 +61,28 @@ def load_weather_data():
     # 1. Prüfe In-Memory Cache
     if CACHED_WEATHER_DATA and (current_time - LAST_FETCH_TIME < CACHE_DURATION):
         logger.info("Verwende gecachte Wetterdaten (In-Memory)")
+        if isinstance(CACHED_WEATHER_DATA, dict):
+            CACHED_WEATHER_DATA['_debug_source'] = "CACHE_MEMORY"
+            CACHED_WEATHER_DATA['_debug_timestamp'] = str(LAST_FETCH_TIME)
         return CACHED_WEATHER_DATA
     
     # 2. Versuche Datei zu laden
     weather_file = None
+    debug_source = "UNKNOWN"
     
     # Prüfe zuerst /tmp (für Vercel)
     if os.path.exists('/tmp'):
         tmp_path = Path('/tmp/wetterdaten.json')
         if tmp_path.exists():
             weather_file = tmp_path
+            debug_source = "FILE_TMP"
     
     # Prüfe dann data/ (für lokale Entwicklung)
     if not weather_file:
         data_path = Path("data/wetterdaten.json")
         if data_path.exists():
             weather_file = data_path
+            debug_source = "FILE_DATA"
             
     if weather_file and weather_file.exists():
         try:
@@ -94,6 +100,9 @@ def load_weather_data():
             if found_location:
                 # Update Cache
                 CACHED_WEATHER_DATA = data[found_location]
+                if isinstance(CACHED_WEATHER_DATA, dict):
+                    CACHED_WEATHER_DATA['_debug_source'] = debug_source
+                    CACHED_WEATHER_DATA['_debug_path'] = str(weather_file)
                 LAST_FETCH_TIME = current_time
                 return CACHED_WEATHER_DATA
                 
@@ -102,13 +111,13 @@ def load_weather_data():
             # Fallback zu Live-Fetch bei defekter Datei
     
 
+    
     # 3. Fallback: Live Abruf wenn keine Datei da ist oder sie fehlerhaft war
     logger.info("Keine lokalen Daten gefunden - Führe Live-Abruf durch...")
     
     if fetch_weather_for_location:
         try:
             # LIVE ABFRAGE: Speichere in /tmp/wetterdaten.json wenn möglich
-            # Dies ist wichtig, damit location_evaluator.py darauf zugreifen kann
             save_path = None
             save_allowed = False
             
@@ -136,6 +145,9 @@ def load_weather_data():
                     CACHED_WEATHER_DATA = fresh_data[found_location]
                     LAST_FETCH_TIME = current_time
                     logger.info("Live-Daten erfolgreich abgerufen und gecacht")
+                    # Return tuple with debug info
+                    if isinstance(CACHED_WEATHER_DATA, dict):
+                        CACHED_WEATHER_DATA['_debug_source'] = "LIVE_FETCH"
                     return CACHED_WEATHER_DATA
         except Exception as e:
             logger.error(f"Live-Abruf fehlgeschlagen: {e}")
@@ -144,6 +156,7 @@ def load_weather_data():
     error_msg = "Wetterdaten konnten weder aus Datei geladen noch live abgerufen werden."
     logger.error(error_msg)
     raise ValueError(error_msg)
+
 
 
 def filter_flight_hours(hourly_data):
