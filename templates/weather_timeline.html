@@ -639,6 +639,10 @@
             thermikGradient.append('stop').attr('offset', '0%').attr('stop-color', '#A855F7').attr('stop-opacity', '0.4');
             thermikGradient.append('stop').attr('offset', '100%').attr('stop-color', '#A855F7').attr('stop-opacity', '0');
 
+            const cloudGradient = defs.append('linearGradient').attr('id', 'cloud-grad').attr('x1', '0').attr('y1', '0').attr('x2', '0').attr('y2', '1');
+            cloudGradient.append('stop').attr('offset', '0%').attr('stop-color', '#475569').attr('stop-opacity', '0.7');
+            cloudGradient.append('stop').attr('offset', '100%').attr('stop-color', '#94A3B8').attr('stop-opacity', '0.1');
+
             // Arrow Marker Definition
             const arrowMarker = defs.append('marker')
                 .attr('id', 'wind-arrow-head')
@@ -772,8 +776,7 @@
 
                 g.append('path')
                     .datum(dayData.cloudbase)
-                    .attr('fill', '#94A3B8')
-                    .attr('fill-opacity', 0.2)
+                    .attr('fill', 'url(#cloud-grad)')
                     .attr('d', coverArea);
 
                 g.append('text').attr('class', 'lane-label').attr('x', width - 10).attr('y', lanes.cloud.y + 15).attr('text-anchor', 'end').text('Bewölkung %');
@@ -865,6 +868,19 @@
                 const curX = xScale(times[idx]);
                 hoverLine.attr('x1', curX).attr('x2', curX).style('opacity', 1);
 
+                let cloudHtml = '';
+                if (c) {
+                    if (c.cover !== null && c.cover !== undefined) {
+                        cloudHtml += `<div class="tooltip-row"><span class="tooltip-label">Bewölkung</span><span class="tooltip-value">${c.cover.toFixed(0)}%</span></div>`;
+                    }
+                    if (c.height !== null && c.height !== undefined) {
+                        cloudHtml += `<div class="tooltip-row"><span class="tooltip-label">Basis</span><span class="tooltip-value">${c.height.toFixed(0)} m</span></div>`;
+                    }
+                    if (!cloudHtml) cloudHtml = `<div class="tooltip-row"><span class="tooltip-label">Wolken</span><span class="tooltip-value">--</span></div>`;
+                } else {
+                    cloudHtml = `<div class="tooltip-row"><span class="tooltip-label">Wolken</span><span class="tooltip-value">--</span></div>`;
+                }
+
                 tooltip.style('opacity', 1)
                     .style('left', (event.pageX + 20) + 'px')
                     .style('top', (event.pageY - 20) + 'px')
@@ -875,7 +891,7 @@
                         <div class="tooltip-row"><span class="tooltip-label">Richtung</span><span class="tooltip-value">${d.direction}° (${getWindDirectionName(d.direction)})</span></div>
                         <div class="tooltip-row" style="margin-top:4px;"><span class="tooltip-label">CAPE</span><span class="tooltip-value">${t ? t.cape.toFixed(0) : 0} J/kg</span></div>
                         <div class="tooltip-row"><span class="tooltip-label">Regen</span><span class="tooltip-value">${p ? p.amount.toFixed(1) : 0} mm</span></div>
-                        <div class="tooltip-row"><span class="tooltip-label">Cloud</span><span class="tooltip-value">${c ? c.height.toFixed(0) : 0} m</span></div>
+                        ${cloudHtml}
                     `);
             }).on('mouseleave', () => {
                 hoverLine.style('opacity', 0);
