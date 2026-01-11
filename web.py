@@ -101,13 +101,27 @@ def load_weather_data():
             logger.error(f"Fehler beim Lesen der Datei {weather_file}: {e}")
             # Fallback zu Live-Fetch bei defekter Datei
     
+
     # 3. Fallback: Live Abruf wenn keine Datei da ist oder sie fehlerhaft war
     logger.info("Keine lokalen Daten gefunden - Führe Live-Abruf durch...")
     
     if fetch_weather_for_location:
         try:
-            # Live Abruf (nicht in Datei speichern, um Vercel Filesystem Probleme zu vermeiden)
-            fresh_data = fetch_weather_for_location(save_to_file=False)
+            # LIVE ABFRAGE: Speichere in /tmp/wetterdaten.json wenn möglich
+            # Dies ist wichtig, damit location_evaluator.py darauf zugreifen kann
+            save_path = None
+            save_allowed = False
+            
+            if os.path.exists('/tmp'): # Vercel
+                save_path = '/tmp/wetterdaten.json'
+                save_allowed = True
+            
+            if save_allowed and save_path:
+                logger.info(f"Speichere Live-Daten temporär nach {save_path}")
+                fresh_data = fetch_weather_for_location(save_to_file=True, output_path=save_path)
+            else:
+                logger.info("Kein passender Speicherpfad - nur im Speicher halten")
+                fresh_data = fetch_weather_for_location(save_to_file=False)
             
             if fresh_data:
                 # Extrahiere Uetliberg Daten
@@ -224,39 +238,65 @@ def format_data_for_charts(hourly_data):
 
 
 def get_evaluation_data():
-    """Lädt LLM-Auswertung aus evaluations.json."""
+    """Lädt LLM-Auswertung aus evaluations.json oder generiert sie wenn nötig."""
     import logging
     logger = logging.getLogger(__name__)
     
     # Für Vercel: Verwende /tmp falls verfügbar, sonst data/
     evaluations_file = None
-    checked_paths = []
     
     # Prüfe zuerst /tmp (für Vercel)
     if os.path.exists('/tmp'):
         tmp_path = Path('/tmp/evaluations.json')
-        checked_paths.append(str(tmp_path))
         if tmp_path.exists():
             evaluations_file = tmp_path
-            logger.info(f"Evaluierungen gefunden in: {tmp_path}")
     
     # Prüfe dann data/ (für lokale Entwicklung)
     if not evaluations_file:
         data_path = Path("data/evaluations.json")
-        checked_paths.append(str(data_path))
         if data_path.exists():
             evaluations_file = data_path
-            logger.info(f"Evaluierungen gefunden in: {data_path}")
     
+    # FALLBACK: Wenn keine Datei existiert, versuche ON-DEMAND zu generieren
     if not evaluations_file or not evaluations_file.exists():
-        error_msg = (
-            f"WARNUNG: evaluations.json nicht gefunden. "
-            f"Geprüfte Pfade: {', '.join(checked_paths)}. "
-            f"Dies ist normal, wenn der Cron-Job noch nicht gelaufen ist. "
-            f"Rufe /api/cron auf, um Daten zu generieren."
-        )
-        logger.warning(error_msg)
-        print(error_msg)
+        logger.warning("Keine Evaluierungsdatei gefunden - versuche On-Demand-Generierung...")
+        
+        try:
+            # 1. Stelle sicher, dass Wetterdaten existieren (lädt sie in Cache & /tmp)
+            load_weather_data()
+            
+            # 2. Prüfe ob Wetterdaten nun in /tmp liegen (durch load_weather_data erstellt)
+            weather_path = None
+            if os.path.exists('/tmp/wetterdaten.json'):
+                weather_path = '/tmp/wetterdaten.json'
+            elif Path("data/wetterdaten.json").exists():
+                weather_path = "data/wetterdaten.json"
+                
+            if weather_path:
+                from location_evaluator import LocationEvaluator
+                logger.info(f"Starte Evaluator mit Wetterdaten aus {weather_path}")
+                evaluator = LocationEvaluator(weather_json_path=weather_path)
+                
+                # Führe Analyse durch (speichert automatisch in /tmp/evaluations.json wenn möglich)
+                results = evaluator.analyze()
+                
+                if results:
+                    logger.info("On-Demand-Analyse erfolgreich!")
+                    # Das Ergebnis ist eine Liste von Dictionaries, wir müssen es in das erwartete Format umwandeln
+                    # group_by_json structure logic is duplicated here, better to reload file or construct dict
+                    
+                    # Versuche die neu erstellte Datei zu laden
+                    if os.path.exists('/tmp/evaluations.json'):
+                         evaluations_file = Path('/tmp/evaluations.json')
+                    elif Path("data/evaluations.json").exists():
+                         evaluations_file = Path("data/evaluations.json")
+                         
+        except Exception as e:
+            logger.error(f"On-Demand-Generierung fehlgeschlagen: {e}")
+
+    # Erneuter Check nach Generierungsversuch
+    if not evaluations_file or not evaluations_file.exists():
+        logger.warning("Konnte keine Evaluierungen laden oder generieren.")
         return {}
     
     try:
@@ -267,16 +307,6 @@ def get_evaluation_data():
         # Extrahiere Evaluierungen aus JSON-Struktur
         evaluations_list = data.get('evaluations', [])
         
-        if not evaluations_list:
-            error_msg = (
-                f"WARNUNG: Keine Evaluierungen in evaluations.json gefunden. "
-                f"Die Datei existiert, ist aber leer oder enthält keine 'evaluations' Liste. "
-                f"Rufe /api/cron auf, um neue Evaluierungen zu generieren."
-            )
-            logger.warning(error_msg)
-            print(error_msg)
-            return {}
-        
         # Gruppiere nach Datum
         evaluations_by_date = {}
         for result in evaluations_list:
@@ -284,33 +314,10 @@ def get_evaluation_data():
             if date:
                 evaluations_by_date[date] = result
         
-        logger.info(f"Erfolgreich {len(evaluations_by_date)} Evaluierungen geladen")
         return evaluations_by_date
         
-    except json.JSONDecodeError as e:
-        error_msg = (
-            f"FEHLER: evaluations.json ist kein gültiges JSON. "
-            f"Datei: {evaluations_file}, Fehler: {str(e)}. "
-            f"Die Datei könnte beschädigt sein. Rufe /api/cron auf, um sie neu zu generieren."
-        )
-        logger.error(error_msg, exc_info=True)
-        print(error_msg)
-        return {}
-    except PermissionError as e:
-        error_msg = (
-            f"FEHLER: Keine Berechtigung zum Lesen von evaluations.json. "
-            f"Datei: {evaluations_file}, Fehler: {str(e)}"
-        )
-        logger.error(error_msg, exc_info=True)
-        print(error_msg)
-        return {}
     except Exception as e:
-        error_msg = (
-            f"FEHLER: Unerwarteter Fehler beim Laden der Evaluierungen. "
-            f"Datei: {evaluations_file}, Fehler: {str(e)}"
-        )
-        logger.error(error_msg, exc_info=True)
-        print(error_msg)
+        logger.error(f"Fehler beim Laden der Evaluierungen: {e}")
         return {}
 
 

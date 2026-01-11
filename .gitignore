@@ -16,6 +16,7 @@ env/
 
 # Daten
 data/wetterdaten.json
+data/evaluations.json
 
 # IDE
 .vscode/
