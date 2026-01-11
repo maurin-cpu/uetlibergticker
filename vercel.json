@@ -5,6 +5,10 @@
       "destination": "/api/cron"
     },
     {
+      "source": "/api/auto-email",
+      "destination": "/api/auto_email"
+    },
+    {
       "source": "/api/weather",
       "destination": "/api/index"
     },
@@ -27,8 +31,8 @@
   ],
   "crons": [
     {
-      "path": "/api/cron",
-      "schedule": "0 5 * * *"
+      "path": "/api/auto-email",
+      "schedule": "*/10 * * * *"
     }
   ]
 }

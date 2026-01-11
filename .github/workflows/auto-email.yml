@@ -1,0 +1,121 @@
+name: Auto Email Cron Job
+
+on:
+  schedule:
+    # Alle 10 Minuten
+    - cron: '*/10 * * * *'
+
+  # Erlaube manuelles Triggern via GitHub UI
+  workflow_dispatch:
+
+jobs:
+  send-weather-email:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check VERCEL_URL Secret
+        run: |
+          if [ -z "${{ secrets.VERCEL_URL }}" ]; then
+            echo "❌ FEHLER: VERCEL_URL Secret ist nicht gesetzt!"
+            echo ""
+            echo "Bitte konfiguriere das Secret:"
+            echo "1. Gehe zu Repository Settings → Secrets and variables → Actions"
+            echo "2. Klicke auf 'New repository secret'"
+            echo "3. Name: VERCEL_URL"
+            echo "4. Wert: https://deine-app.vercel.app (ohne trailing slash)"
+            echo ""
+            exit 1
+          else
+            echo "✅ VERCEL_URL Secret gefunden"
+            # Entferne https:// falls bereits vorhanden, füge es dann wieder hinzu
+            VERCEL_URL="${{ secrets.VERCEL_URL }}"
+            if [[ ! "$VERCEL_URL" =~ ^https?:// ]]; then
+              VERCEL_URL="https://$VERCEL_URL"
+            fi
+            echo "URL: $VERCEL_URL"
+            echo "VERCEL_URL=$VERCEL_URL" >> $GITHUB_ENV
+          fi
+
+      - name: Trigger Vercel Auto-Email Endpoint
+        env:
+          VERCEL_URL: ${{ secrets.VERCEL_URL }}
+        run: |
+          # Stelle sicher, dass URL mit https:// beginnt
+          if [[ ! "$VERCEL_URL" =~ ^https?:// ]]; then
+            VERCEL_URL="https://$VERCEL_URL"
+          fi
+          
+          ENDPOINT="${VERCEL_URL}/api/auto-email"
+          echo "🔄 Triggering auto-email endpoint..."
+          echo "Endpoint: $ENDPOINT"
+          echo ""
+          
+          # Führe curl mit besserer Fehlerbehandlung aus
+          RESPONSE=$(curl -s -w "\n%{http_code}" --max-time 60 "$ENDPOINT" || echo -e "\n000")
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "HTTP Status Code: $HTTP_CODE"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo ""
+          echo "Response Body:"
+          
+          # Versuche JSON zu formatieren, falls möglich
+          if command -v jq &> /dev/null; then
+            echo "$BODY" | jq '.' 2>/dev/null || echo "$BODY"
+          else
+            echo "$BODY"
+          fi
+          
+          echo ""
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+          # Prüfe HTTP Status Code
+          if [ "$HTTP_CODE" = "000" ]; then
+            echo "❌ FEHLER: Verbindung fehlgeschlagen!"
+            echo "Mögliche Ursachen:"
+            echo "  - VERCEL_URL ist falsch konfiguriert"
+            echo "  - Vercel App ist nicht erreichbar"
+            echo "  - Netzwerkproblem"
+            exit 1
+          elif [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+            echo "✅ Auto-email erfolgreich getriggert!"
+            
+            # Prüfe ob E-Mails gesendet wurden (aus JSON Response)
+            if echo "$BODY" | grep -q '"emails_sent"'; then
+              EMAILS_SENT=$(echo "$BODY" | grep -o '"emails_sent":[0-9]*' | grep -o '[0-9]*' || echo "0")
+              if [ "$EMAILS_SENT" -gt 0 ]; then
+                echo "📧 $EMAILS_SENT E-Mail(s) wurden gesendet"
+              else
+                echo "⚠️ Keine E-Mails gesendet (möglicherweise keine Evaluierungen vorhanden)"
+              fi
+            fi
+          else
+            echo "❌ Auto-email Trigger fehlgeschlagen mit Status $HTTP_CODE"
+            echo ""
+            echo "Mögliche Ursachen:"
+            echo "  - Environment Variables fehlen in Vercel"
+            echo "  - E-Mail-Konfiguration ist falsch"
+            echo "  - Server-Fehler in der Vercel Function"
+            echo ""
+            echo "Prüfe die Vercel Logs für Details:"
+            echo "  Vercel Dashboard → Projekt → Deployments → Functions → Logs"
+            exit 1
+          fi
+
+      - name: Send notification on failure
+        if: failure()
+        run: |
+          echo ""
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "⚠️ Auto-email Cron Job fehlgeschlagen!"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo ""
+          echo "Bitte prüfe:"
+          echo "1. Ist VERCEL_URL Secret korrekt gesetzt?"
+          echo "2. Sind alle Environment Variables in Vercel gesetzt?"
+          echo "3. Ist die Vercel App erreichbar?"
+          echo "4. Prüfe die Vercel Logs für detaillierte Fehlermeldungen"
+          echo ""
+          echo "Siehe VERCEL_SETUP.md für weitere Hilfe."

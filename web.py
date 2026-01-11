@@ -35,30 +35,95 @@ app = Flask(__name__, template_folder=str(template_dir))
 
 def load_weather_data():
     """Lädt Wetterdaten aus JSON-Datei."""
+    import logging
+    logger = logging.getLogger(__name__)
+    
     # Für Vercel: Verwende /tmp falls verfügbar, sonst data/
     # Prüfe beide möglichen Pfade
     weather_file = None
-    if os.path.exists('/tmp') and Path('/tmp/wetterdaten.json').exists():
-        weather_file = Path('/tmp/wetterdaten.json')
-    elif Path("data/wetterdaten.json").exists():
-        weather_file = Path("data/wetterdaten.json")
+    checked_paths = []
+    
+    # Prüfe zuerst /tmp (für Vercel)
+    if os.path.exists('/tmp'):
+        tmp_path = Path('/tmp/wetterdaten.json')
+        checked_paths.append(str(tmp_path))
+        if tmp_path.exists():
+            weather_file = tmp_path
+            logger.info(f"Wetterdaten gefunden in: {tmp_path}")
+    
+    # Prüfe dann data/ (für lokale Entwicklung)
+    if not weather_file:
+        data_path = Path("data/wetterdaten.json")
+        checked_paths.append(str(data_path))
+        if data_path.exists():
+            weather_file = data_path
+            logger.info(f"Wetterdaten gefunden in: {data_path}")
     
     if not weather_file or not weather_file.exists():
-        raise FileNotFoundError(
+        error_msg = (
             f"Wetterdaten nicht gefunden. "
+            f"Geprüfte Pfade: {', '.join(checked_paths)}. "
             f"Bitte warten Sie, bis der Cron-Job die Daten erstellt hat, "
-            f"oder führen Sie manuell 'python fetch_weather.py' aus."
+            f"oder rufen Sie /api/cron auf, um Daten zu generieren."
         )
+        logger.error(error_msg)
+        raise FileNotFoundError(error_msg)
     
-    with open(weather_file, 'r', encoding='utf-8') as f:
-        data = json.load(f)
-    
-    # Suche Uetliberg Eintrag
-    for key in data.keys():
-        if 'uetliberg' in key.lower() or 'balderen' in key.lower():
-            return data[key]
-    
-    raise ValueError("Keine Wetterdaten für Uetliberg gefunden")
+    try:
+        logger.info(f"Lade Wetterdaten aus: {weather_file}")
+        with open(weather_file, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        
+        if not data:
+            error_msg = (
+                f"Wetterdaten-Datei ist leer: {weather_file}. "
+                f"Rufe /api/cron auf, um neue Daten zu generieren."
+            )
+            logger.error(error_msg)
+            raise ValueError(error_msg)
+        
+        # Suche Uetliberg Eintrag
+        found_location = None
+        for key in data.keys():
+            if 'uetliberg' in key.lower() or 'balderen' in key.lower():
+                found_location = key
+                logger.info(f"Uetliberg-Daten gefunden unter Key: {key}")
+                break
+        
+        if not found_location:
+            available_keys = ', '.join(data.keys()) if data else 'keine'
+            error_msg = (
+                f"Keine Wetterdaten für Uetliberg gefunden. "
+                f"Verfügbare Keys in Datei: {available_keys}. "
+                f"Erwarteter Key sollte 'Uetliberg' oder 'Balderen' enthalten."
+            )
+            logger.error(error_msg)
+            raise ValueError(error_msg)
+        
+        return data[found_location]
+        
+    except json.JSONDecodeError as e:
+        error_msg = (
+            f"FEHLER: wetterdaten.json ist kein gültiges JSON. "
+            f"Datei: {weather_file}, Fehler: {str(e)}. "
+            f"Die Datei könnte beschädigt sein. Rufe /api/cron auf, um sie neu zu generieren."
+        )
+        logger.error(error_msg, exc_info=True)
+        raise ValueError(error_msg) from e
+    except PermissionError as e:
+        error_msg = (
+            f"FEHLER: Keine Berechtigung zum Lesen von wetterdaten.json. "
+            f"Datei: {weather_file}, Fehler: {str(e)}"
+        )
+        logger.error(error_msg, exc_info=True)
+        raise PermissionError(error_msg) from e
+    except Exception as e:
+        error_msg = (
+            f"FEHLER: Unerwarteter Fehler beim Laden der Wetterdaten. "
+            f"Datei: {weather_file}, Fehler: {str(e)}"
+        )
+        logger.error(error_msg, exc_info=True)
+        raise
 
 
 def filter_flight_hours(hourly_data):
@@ -154,18 +219,42 @@ def format_data_for_charts(hourly_data):
 
 def get_evaluation_data():
     """Lädt LLM-Auswertung aus evaluations.json."""
+    import logging
+    logger = logging.getLogger(__name__)
+    
     # Für Vercel: Verwende /tmp falls verfügbar, sonst data/
     evaluations_file = None
-    if os.path.exists('/tmp') and Path('/tmp/evaluations.json').exists():
-        evaluations_file = Path('/tmp/evaluations.json')
-    elif Path("data/evaluations.json").exists():
-        evaluations_file = Path("data/evaluations.json")
+    checked_paths = []
+    
+    # Prüfe zuerst /tmp (für Vercel)
+    if os.path.exists('/tmp'):
+        tmp_path = Path('/tmp/evaluations.json')
+        checked_paths.append(str(tmp_path))
+        if tmp_path.exists():
+            evaluations_file = tmp_path
+            logger.info(f"Evaluierungen gefunden in: {tmp_path}")
+    
+    # Prüfe dann data/ (für lokale Entwicklung)
+    if not evaluations_file:
+        data_path = Path("data/evaluations.json")
+        checked_paths.append(str(data_path))
+        if data_path.exists():
+            evaluations_file = data_path
+            logger.info(f"Evaluierungen gefunden in: {data_path}")
     
     if not evaluations_file or not evaluations_file.exists():
-        print(f"Warnung: evaluations.json nicht gefunden")
+        error_msg = (
+            f"WARNUNG: evaluations.json nicht gefunden. "
+            f"Geprüfte Pfade: {', '.join(checked_paths)}. "
+            f"Dies ist normal, wenn der Cron-Job noch nicht gelaufen ist. "
+            f"Rufe /api/cron auf, um Daten zu generieren."
+        )
+        logger.warning(error_msg)
+        print(error_msg)
         return {}
     
     try:
+        logger.info(f"Lade Evaluierungen aus: {evaluations_file}")
         with open(evaluations_file, 'r', encoding='utf-8') as f:
             data = json.load(f)
         
@@ -173,7 +262,13 @@ def get_evaluation_data():
         evaluations_list = data.get('evaluations', [])
         
         if not evaluations_list:
-            print("Warnung: Keine Evaluierungen in evaluations.json gefunden")
+            error_msg = (
+                f"WARNUNG: Keine Evaluierungen in evaluations.json gefunden. "
+                f"Die Datei existiert, ist aber leer oder enthält keine 'evaluations' Liste. "
+                f"Rufe /api/cron auf, um neue Evaluierungen zu generieren."
+            )
+            logger.warning(error_msg)
+            print(error_msg)
             return {}
         
         # Gruppiere nach Datum
@@ -183,12 +278,33 @@ def get_evaluation_data():
             if date:
                 evaluations_by_date[date] = result
         
+        logger.info(f"Erfolgreich {len(evaluations_by_date)} Evaluierungen geladen")
         return evaluations_by_date
+        
     except json.JSONDecodeError as e:
-        print(f"Fehler beim Parsen von evaluations.json: {e}")
+        error_msg = (
+            f"FEHLER: evaluations.json ist kein gültiges JSON. "
+            f"Datei: {evaluations_file}, Fehler: {str(e)}. "
+            f"Die Datei könnte beschädigt sein. Rufe /api/cron auf, um sie neu zu generieren."
+        )
+        logger.error(error_msg, exc_info=True)
+        print(error_msg)
+        return {}
+    except PermissionError as e:
+        error_msg = (
+            f"FEHLER: Keine Berechtigung zum Lesen von evaluations.json. "
+            f"Datei: {evaluations_file}, Fehler: {str(e)}"
+        )
+        logger.error(error_msg, exc_info=True)
+        print(error_msg)
         return {}
     except Exception as e:
-        print(f"Fehler beim Laden der Evaluierungen: {e}")
+        error_msg = (
+            f"FEHLER: Unerwarteter Fehler beim Laden der Evaluierungen. "
+            f"Datei: {evaluations_file}, Fehler: {str(e)}"
+        )
+        logger.error(error_msg, exc_info=True)
+        print(error_msg)
         return {}
 
 
