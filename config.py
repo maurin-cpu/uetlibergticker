@@ -26,6 +26,8 @@ API_MODEL = "best_match"
 API_TIMEOUT = 30
 FORECAST_DAYS = 3
 TIMEZONE = "Europe/Zurich"
+# HINWEIS: Die Cron-Job Zeit wird in vercel.json konfiguriert!
+# Aktuell eingestellt auf 18:40 UTC (19:40 CET / 20:40 CEST)
 
 # ============================================================================
 # FLUGSTUNDEN-KONFIGURATION

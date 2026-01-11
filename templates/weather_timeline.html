@@ -738,22 +738,35 @@
                 .attr('rx', 2);
 
             // 3. Cloud Lane
-            const minCloud = d3.min(dayData.cloudbase, d => d.height);
-            const maxCloud = d3.max(dayData.cloudbase, d => d.height);
-            const yCloud = d3.scaleLinear().domain([Math.max(0, minCloud - 500), maxCloud + 500]).range([lanes.cloud.y + lanes.cloud.h, lanes.cloud.y]);
+            const hasCloudData = dayData.cloudbase && dayData.cloudbase.length > 0;
+            
+            if (hasCloudData) {
+                const minCloud = d3.min(dayData.cloudbase, d => d.height);
+                const maxCloud = d3.max(dayData.cloudbase, d => d.height);
+                const yCloud = d3.scaleLinear().domain([Math.max(0, minCloud - 500), maxCloud + 500]).range([lanes.cloud.y + lanes.cloud.h, lanes.cloud.y]);
 
-            const cloudLine = d3.line()
-                .x((d, i) => xScale(times[i]))
-                .y(d => yCloud(d.height))
-                .curve(d3.curveMonotoneX);
+                const cloudLine = d3.line()
+                    .x((d, i) => xScale(times[i]))
+                    .y(d => yCloud(d.height))
+                    .curve(d3.curveMonotoneX);
 
-            g.append('path')
-                .datum(dayData.cloudbase)
-                .attr('fill', 'none')
-                .attr('stroke', '#BAE6FD')
-                .attr('stroke-width', 2)
-                .attr('stroke-dasharray', '4,4')
-                .attr('d', cloudLine);
+                g.append('path')
+                    .datum(dayData.cloudbase)
+                    .attr('fill', 'none')
+                    .attr('stroke', '#BAE6FD')
+                    .attr('stroke-width', 2)
+                    .attr('stroke-dasharray', '4,4')
+                    .attr('d', cloudLine);
+            } else {
+                g.append('text')
+                    .attr('x', width / 2)
+                    .attr('y', lanes.cloud.y + lanes.cloud.h / 2)
+                    .attr('text-anchor', 'middle')
+                    .attr('fill', 'var(--color-text-light)')
+                    .style('font-size', '13px')
+                    .style('font-style', 'italic')
+                    .text('Keine Wolkendaten verfügbar (Modell-Limitierung)');
+            }
 
             // Achsen & Labels
             g.append('g').attr('class', 'axis')
