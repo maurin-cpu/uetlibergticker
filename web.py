@@ -368,7 +368,10 @@ def api_weather():
             },
             'days': days_formatted,
             'dates': sorted_dates,
-            'total_hours': len(flight_hours_data)
+            'total_hours': len(flight_hours_data),
+            '_debug_source': weather_data.get('_debug_source'),
+            '_debug_path': weather_data.get('_debug_path'),
+            '_debug_timestamp': weather_data.get('_debug_timestamp')
         })
     except Exception as e:
         return jsonify({
@@ -381,22 +384,8 @@ def api_weather():
 def api_weather_raw():
     """API-Endpoint für rohe Wetterdaten (kompatibel mit direktem JSON-Zugriff)."""
     try:
-        # Lade die rohen JSON-Daten direkt
-        # Für Vercel: Verwende /tmp falls verfügbar, sonst data/
-        weather_file = None
-        if os.path.exists('/tmp') and Path('/tmp/wetterdaten.json').exists():
-            weather_file = Path('/tmp/wetterdaten.json')
-        elif Path("data/wetterdaten.json").exists():
-            weather_file = Path("data/wetterdaten.json")
-        
-        if not weather_file or not weather_file.exists():
-            return jsonify({
-                'error': 'Wetterdaten nicht gefunden. Bitte warten Sie, bis der Cron-Job die Daten erstellt hat.'
-            }), 404
-        
-        with open(weather_file, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-        
+        # Verwende load_weather_data für konsistentes Verhalten (inkl. Fallback & Cache)
+        data = load_weather_data()
         return jsonify(data)
     except Exception as e:
         return jsonify({
