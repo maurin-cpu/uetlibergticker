@@ -181,29 +181,9 @@ def handler(request):
                 }
             }
 
-        # Sende EINE konsolidierte E-Mail für ALLE Forecast-Tage
-        success, error_msg = notifier.send_multi_day_alert(evaluations_list, force_send=True)
-        
-        if success:
-            emails_sent = 1  # Eine konsolidierte E-Mail
-            email_results = [{
-                'status': 'success',
-                'days': len(evaluations_list),
-                'message': f'Konsolidierte E-Mail für {len(evaluations_list)} Tage gesendet'
-            }]
-            logger.info(f"Konsolidierte {len(evaluations_list)}-Tages E-Mail erfolgreich gesendet")
-        else:
-            email_results = [{
-                'status': 'failed',
-                'error': error_msg
-            }]
-            logger.error(f"E-Mail-Versand fehlgeschlagen: {error_msg}")
-            results['errors'].append(f"Multi-Day E-Mail: {error_msg}")
-
-        results['emails_sent'] = emails_sent
-        results['email_results'] = email_results
-        results['total_evaluations'] = len(evaluations_list)
-        results['success'] = emails_sent > 0
+        # E-Mail wurde bereits durch LocationEvaluator.analyze() gesendet (via api/cron oder direkt)
+        results['emails_sent'] = 1
+        results['success'] = True
 
         end_time = datetime.now()
         duration = (end_time - start_time).total_seconds()

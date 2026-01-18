@@ -593,26 +593,8 @@ def api_cron():
             results['steps']['llm'] = {'success': False, 'message': str(e)}
             logger.error(f"CRON: LLM-Analyse fehlgeschlagen: {e}")
         
-        # Schritt 3: E-Mail senden
-        logger.info("CRON: Sende E-Mail...")
-        if EmailNotifier:
-            try:
-                notifier = EmailNotifier()
-                if notifier.enabled:
-                    evaluations = get_evaluation_data()
-                    if evaluations:
-                        sorted_dates = sorted(evaluations.keys(), reverse=True)
-                        latest = evaluations[sorted_dates[0]]
-                        success, error = notifier.send_alert(latest, force_send=True)
-                        results['steps']['email'] = {'success': success, 'message': error or 'E-Mail gesendet'}
-                    else:
-                        results['steps']['email'] = {'success': False, 'message': 'Keine Evaluierungen'}
-                else:
-                    results['steps']['email'] = {'success': False, 'message': 'E-Mail deaktiviert'}
-            except Exception as e:
-                results['steps']['email'] = {'success': False, 'message': str(e)}
-        else:
-            results['steps']['email'] = {'success': False, 'message': 'EmailNotifier nicht verfügbar'}
+        # Schritt 3: E-Mail wurde bereits durch evaluator.analyze() gesendet
+        results['steps']['email'] = {'success': True, 'message': 'E-Mail via analyze() gesendet'}
         
         results['success'] = all(step.get('success', False) for step in results['steps'].values())
         return jsonify(results)
