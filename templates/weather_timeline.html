@@ -101,29 +101,6 @@
             background: #334155;
         }
 
-        .test-email-button {
-            margin-top: 16px;
-            padding: 10px 20px;
-            background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%);
-            color: white;
-            border: none;
-            border-radius: 8px;
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            box-shadow: 0 4px 6px rgba(99, 102, 241, 0.3);
-        }
-
-        .test-email-button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 12px rgba(99, 102, 241, 0.4);
-        }
-
-        .test-email-button:active {
-            transform: translateY(0);
-        }
-
         .test-email-button:disabled {
             opacity: 0.5;
             cursor: not-allowed;
@@ -375,11 +352,12 @@
                 <label for="day-select">Zeitraum wählen</label>
                 <select id="day-select"></select>
             </div>
-            <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--color-border);">
-                <button class="test-email-button" id="test-email-btn">
-                    📧 Test-E-Mail senden
+            <div
+                style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--color-border); display: flex; flex-wrap: wrap; gap: 12px;">
+                <button class="trigger-update-button" id="trigger-update-btn">
+                    🔄 Daten aktualisieren & E-Mail senden
                 </button>
-                <div class="test-email-message" id="test-email-message"></div>
+                <div class="test-email-message" id="test-email-message" style="width: 100%;"></div>
             </div>
         </div>
 
@@ -718,6 +696,18 @@
                     .attr('stroke-width', 2)
                     .attr('marker-end', 'url(#wind-arrow-head)')
                     .attr('transform', `rotate(${rotation}, ${x}, ${y})`);
+
+                // Wind Speed Label (every 2nd hour to avoid clutter)
+                if (i % 2 === 0) {
+                    arrowGroup.append('text')
+                        .attr('x', x)
+                        .attr('y', yWind(d.speed) - 25)
+                        .attr('text-anchor', 'middle')
+                        .attr('fill', '#818CF8')
+                        .style('font-size', '10px')
+                        .style('font-weight', '700')
+                        .text(`${d.speed.toFixed(0)}`);
+                }
             });
 
             // 2. Thermik & Regen Lane
@@ -809,6 +799,20 @@
                     .attr('cy', d => yCloudBase(d.height))
                     .attr('r', 2)
                     .attr('fill', '#BAE6FD');
+
+                // Cloud Base Label (every 3rd hour to avoid clutter)
+                dayData.cloudbase.forEach((d, i) => {
+                    if (d.height !== null && i % 3 === 0) {
+                        g.append('text')
+                            .attr('x', xScale(new Date(d.time)))
+                            .attr('y', yCloudBase(d.height) - 10)
+                            .attr('text-anchor', 'middle')
+                            .attr('fill', '#BAE6FD')
+                            .style('font-size', '10px')
+                            .style('font-weight', '700')
+                            .text(`${d.height.toFixed(0)}m`);
+                    }
+                });
             }
 
             if (!hasCloudBase && !hasCloudCover) {
@@ -907,19 +911,20 @@
             container.insertBefore(errorDiv, container.firstChild);
         }
 
-        // Test-E-Mail Button Handler
-        document.getElementById('test-email-btn').addEventListener('click', async function () {
+        // Manual Trigger Button Handler
+        document.getElementById('trigger-update-btn').addEventListener('click', async function () {
             const btn = this;
             const messageDiv = document.getElementById('test-email-message');
 
             // Button deaktivieren
             btn.disabled = true;
-            btn.textContent = '📧 Sende...';
+            const originalText = btn.textContent;
+            btn.innerHTML = '<div class="spinner" style="width: 14px; height: 14px; border-width: 2px; margin: 0; display: inline-block;"></div> Aktualisiere...';
             messageDiv.className = 'test-email-message';
             messageDiv.textContent = '';
 
             try {
-                const response = await fetch('/api/test-email', {
+                const response = await fetch('/api/trigger-update', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -930,18 +935,25 @@
 
                 if (data.success) {
                     messageDiv.className = 'test-email-message success';
-                    messageDiv.textContent = '✅ ' + data.message;
+                    messageDiv.textContent = '✅ Daten erfolgreich aktualisiert und E-Mail versendet! Seite wird in 3s neu geladen...';
+
+                    // Seite neu laden nach 3 Sekunden
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 3000);
                 } else {
                     messageDiv.className = 'test-email-message error';
-                    messageDiv.textContent = '❌ ' + (data.error || 'Unbekannter Fehler');
+                    messageDiv.textContent = '❌ ' + (data.error || 'Fehler beim Update');
                 }
             } catch (error) {
                 messageDiv.className = 'test-email-message error';
-                messageDiv.textContent = '❌ Fehler beim Senden: ' + error.message;
+                messageDiv.textContent = '❌ Netzwerkfehler: ' + error.message;
             } finally {
-                // Button wieder aktivieren
-                btn.disabled = false;
-                btn.textContent = '📧 Test-E-Mail senden';
+                // Button wieder aktivieren falls kein Reload
+                if (messageDiv.className.indexOf('success') === -1) {
+                    btn.disabled = false;
+                    btn.textContent = originalText;
+                }
             }
         });
 

@@ -52,10 +52,13 @@ def handler(request):
         try:
             from fetch_weather import fetch_weather_for_location
             
-            # Für Vercel: Speichere in /tmp
+            from config import get_weather_json_path
+            weather_path = str(get_weather_json_path())
+            
+            # Wetterdaten abrufen
             weather_data = fetch_weather_for_location(
                 save_to_file=True,
-                output_path='/tmp/wetterdaten.json'
+                output_path=weather_path
             )
             
             if weather_data:
@@ -86,8 +89,11 @@ def handler(request):
         try:
             from location_evaluator import LocationEvaluator
             
-            # Verwende /tmp für Wetterdaten
-            evaluator = LocationEvaluator(weather_json_path='/tmp/wetterdaten.json')
+            from config import get_weather_json_path
+            weather_path = str(get_weather_json_path())
+            
+            # Verwende zentralen Pfad für Wetterdaten
+            evaluator = LocationEvaluator(weather_json_path=weather_path)
             analysis_results = evaluator.analyze()
             
             if analysis_results:

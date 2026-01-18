@@ -426,6 +426,206 @@ class EmailNotifier:
         """
         return html.strip()
     
+    def send_multi_day_alert(self, results_list: list, raise_exception: bool = False, force_send: bool = True) -> Tuple[bool, Optional[str]]:
+        """
+        Sendet EINE konsolidierte E-Mail für ALLE Forecast-Tage (statt eine E-Mail pro Tag).
+        
+        Args:
+            results_list: Liste von Evaluierungs-Ergebnissen (ein Dict pro Tag)
+            raise_exception: Wenn True, wird eine Exception geworfen statt False zurückzugeben
+            force_send: Wenn True, wird die E-Mail auch gesendet wenn conditions nicht EXCELLENT/GOOD sind
+            
+        Returns:
+            Tuple (success: bool, error_message: Optional[str])
+        """
+        if not self.enabled:
+            error_msg = "E-Mail-Benachrichtigung deaktiviert: Fehlende Konfiguration in .env"
+            if raise_exception:
+                raise ValueError(error_msg)
+            return False, error_msg
+        
+        if not results_list:
+            return False, "Keine Ergebnisse zu versenden"
+        
+        try:
+            subject = self._create_multi_day_subject(results_list)
+            html_body = self._create_multi_day_html_body(results_list)
+            text_body = self._create_multi_day_body(results_list)  # Fallback Plain-Text
+            
+            msg = MIMEMultipart('alternative')
+            msg['From'] = self.sender
+            msg['To'] = self.recipient
+            msg['Subject'] = subject
+            
+            # Plain-Text Version (Fallback)
+            msg.attach(MIMEText(text_body, 'plain', 'utf-8'))
+            # HTML Version
+            msg.attach(MIMEText(html_body, 'html', 'utf-8'))
+            
+            # SMTP-Versand (gleiche Logik wie send_alert)
+            try:
+                server = smtplib.SMTP(self.smtp_server, self.smtp_port, timeout=10)
+            except Exception as e:
+                error_msg = f"Verbindung zum SMTP-Server fehlgeschlagen: {str(e)}"
+                logger.error(error_msg)
+                if raise_exception:
+                    raise ConnectionError(error_msg)
+                return False, error_msg
+            
+            try:
+                server.starttls()
+                server.login(self.sender, self.password)
+                server.send_message(msg)
+                server.quit()
+            except Exception as e:
+                error_msg = f"E-Mail-Versand fehlgeschlagen: {str(e)}"
+                logger.error(error_msg)
+                server.quit()
+                if raise_exception:
+                    raise RuntimeError(error_msg)
+                return False, error_msg
+            
+            logger.info(f"Multi-Day E-Mail erfolgreich gesendet für {len(results_list)} Tage")
+            return True, None
+            
+        except Exception as e:
+            error_msg = f"Unerwarteter Fehler: {str(e)}"
+            logger.error(error_msg)
+            if raise_exception:
+                raise
+            return False, error_msg
+    
+    def _create_multi_day_subject(self, results_list: list) -> str:
+        """Erstellt den E-Mail-Betreff für Multi-Day Forecast."""
+        location = results_list[0].get('location', 'Uetliberg')
+        num_days = len(results_list)
+        return f"🪂 {num_days}-Tages Flug-Forecast - {location}"
+    
+    def _create_multi_day_body(self, results_list: list) -> str:
+        """Erstellt den Plain-Text E-Mail-Body für Multi-Day Forecast."""
+        lines = [
+            "╔" + "═" * 68 + "╗",
+            "║" + " " * 18 + "🪂 FLUGBARKEITS-FORECAST" + " " * 18 + "║",
+            "╚" + "═" * 68 + "╝",
+            "",
+            f"📍 Startplatz: {results_list[0].get('location', 'Uetliberg')}",
+            f"📅 Forecast für {len(results_list)} Tage",
+            "",
+            "━" * 70,
+        ]
+        
+        for i, result in enumerate(results_list, 1):
+            date = result.get('date', '')
+            conditions = result.get('conditions', 'UNKNOWN')
+            flyable = result.get('flyable', False)
+            rating = result.get('rating', 0)
+            summary = result.get('summary', '')
+            
+            condition_icon = {'EXCELLENT': '✅', 'GOOD': '✅', 'MODERATE': '⚠️', 'POOR': '❌', 'DANGEROUS': '🚫'}.get(conditions, '❓')
+            flyable_text = "FLUGBAR ✅" if flyable else "NICHT FLUGBAR ❌"
+            
+            lines.extend([
+                "",
+                f"TAG {i}: {date}",
+                "-" * 70,
+                f"{condition_icon} Status: {flyable_text} - {conditions}",
+                f"⭐ Bewertung: {'⭐' * min(int(rating), 10)} ({rating}/10)",
+                f"📝 {summary}",
+                "",
+            ])
+        
+        lines.append("━" * 70)
+        return "\n".join(lines)
+    
+    def _create_multi_day_html_body(self, results_list: list) -> str:
+        """Erstellt den HTML E-Mail-Body für Multi-Day Forecast."""
+        location = results_list[0].get('location', 'Uetliberg')
+        
+        # Header
+        html_parts = [
+            """<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flugbarkeits-Forecast</title>
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: 0 auto; padding: 20px; background-color: #f5f5f5;">
+    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
+        <h1 style="margin: 0; font-size: 28px;">🪂 FLUGBARKEITS-FORECAST</h1>
+        <p style="margin: 10px 0 0 0;">""" + location + """ - """ + str(len(results_list)) + """ Tage</p>
+    </div>
+    
+    <div style="background: white; padding: 30px; border-radius: 0 0 10px 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+"""
+        ]
+        
+        # Tages-Karten
+        for i, result in enumerate(results_list, 1):
+            date = result.get('date', '')
+            conditions = result.get('conditions', 'UNKNOWN')
+            flyable = result.get('flyable', False)
+            rating = result.get('rating', 0)
+            summary = result.get('summary', '')
+            details = result.get('details', {})
+            
+            # Formatiere Datum
+            try:
+                dt = datetime.strptime(date, "%Y-%m-%d")
+                date_str = dt.strftime("%d.%m.%Y")
+                weekday = dt.strftime("%A")
+                weekday_de = {'Monday': 'Montag', 'Tuesday': 'Dienstag', 'Wednesday': 'Mittwoch',
+                            'Thursday': 'Donnerstag', 'Friday': 'Freitag', 'Saturday': 'Samstag', 'Sunday': 'Sonntag'}.get(weekday, weekday)
+            except:
+                date_str = date
+                weekday_de = ""
+            
+            condition_styles = {
+                'EXCELLENT': {'icon': '✅', 'color': '#22c55e', 'bg': '#dcfce7'},
+                'GOOD': {'icon': '✅', 'color': '#22c55e', 'bg': '#dcfce7'},
+                'MODERATE': {'icon': '⚠️', 'color': '#f59e0b', 'bg': '#fef3c7'},
+                'POOR': {'icon': '❌', 'color': '#ef4444', 'bg': '#fee2e2'},
+                'DANGEROUS': {'icon': '🚫', 'color': '#dc2626', 'bg': '#fee2e2'}
+            }
+            style = condition_styles.get(conditions, {'icon': '❓', 'color': '#6b7280', 'bg': '#f3f4f6'})
+            
+            flyable_text = "FLUGBAR ✅" if flyable else "NICHT FLUGBAR ❌"
+            rating_stars = '⭐' * min(int(rating), 10)
+            
+            html_parts.append(f"""
+        <!-- Tag {i} -->
+        <div style="margin-bottom: 30px; border: 2px solid {style['color']}; border-radius: 10px; padding: 20px; background: {style['bg']};">
+            <h2 style="margin: 0 0 10px 0; color: {style['color']};">TAG {i}: {date_str} ({weekday_de})</h2>
+            <div style="font-size: 20px; font-weight: bold; margin-bottom: 15px;">{style['icon']} {flyable_text} - {conditions}</div>
+            <div style="margin-bottom: 10px;">⭐ {rating_stars} ({rating}/10)</div>
+            <div style="background: white; padding: 15px; border-radius: 6px; margin-top: 15px;">
+                <p style="margin: 0; font-weight: 500;">{summary}</p>
+            </div>
+            <details style="margin-top: 15px;">
+                <summary style="cursor: pointer; font-weight: 600; padding: 10px; background: white; border-radius: 6px;">📊 Details anzeigen</summary>
+                <div style="margin-top: 10px; padding: 15px; background: white; border-radius: 6px;">
+                    <div style="margin-bottom: 10px;"><strong>💨 Wind:</strong> {details.get('wind', 'Nicht verfügbar')}</div>
+                    <div style="margin-bottom: 10px;"><strong>☁️ Thermik:</strong> {details.get('thermik', 'Nicht verfügbar')}</div>
+                    <div><strong>⚠️ Risiken:</strong> {details.get('risks', 'Nicht verfügbar')}</div>
+                </div>
+            </details>
+        </div>
+""")
+        
+        # Footer
+        html_parts.append("""
+        <hr style="border: none; border-top: 2px solid #e5e7eb; margin: 30px 0;">
+        <div style="text-align: center; color: #6b7280; font-size: 12px;">
+            <p style="margin: 5px 0;">📧 Erstellt: """ + datetime.now().strftime('%d.%m.%Y %H:%M:%S') + """</p>
+            <p style="margin: 5px 0;">Uetliberg Ticker - Automatische Wetteranalyse</p>
+        </div>
+    </div>
+</body>
+</html>
+""")
+        
+        return "".join(html_parts)
+    
     def check_configuration(self) -> Dict[str, any]:
         """
         Überprüft die E-Mail-Konfiguration und gibt detaillierte Informationen zurück.

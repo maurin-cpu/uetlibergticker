@@ -9,7 +9,13 @@ import os
 from datetime import datetime
 from pathlib import Path
 from flask import Flask, render_template, jsonify, request
-from config import FLIGHT_HOURS_START, FLIGHT_HOURS_END, LOCATION
+from config import (
+    FLIGHT_HOURS_START, 
+    FLIGHT_HOURS_END, 
+    LOCATION, 
+    get_weather_json_path, 
+    get_evaluations_json_path
+)
 
 # Lade .env Datei explizit
 try:
@@ -67,22 +73,8 @@ def load_weather_data():
         return CACHED_WEATHER_DATA
     
     # 2. Versuche Datei zu laden
-    weather_file = None
-    debug_source = "UNKNOWN"
-    
-    # Prüfe zuerst /tmp (für Vercel)
-    if os.path.exists('/tmp'):
-        tmp_path = Path('/tmp/wetterdaten.json')
-        if tmp_path.exists():
-            weather_file = tmp_path
-            debug_source = "FILE_TMP"
-    
-    # Prüfe dann data/ (für lokale Entwicklung)
-    if not weather_file:
-        data_path = Path("data/wetterdaten.json")
-        if data_path.exists():
-            weather_file = data_path
-            debug_source = "FILE_DATA"
+    weather_file = get_weather_json_path()
+    debug_source = "FILE_SYSTEM"
             
     if weather_file and weather_file.exists():
         try:
@@ -118,19 +110,9 @@ def load_weather_data():
     if fetch_weather_for_location:
         try:
             # LIVE ABFRAGE: Speichere in /tmp/wetterdaten.json wenn möglich
-            save_path = None
-            save_allowed = False
-            
-            if os.path.exists('/tmp'): # Vercel
-                save_path = '/tmp/wetterdaten.json'
-                save_allowed = True
-            
-            if save_allowed and save_path:
-                logger.info(f"Speichere Live-Daten temporär nach {save_path}")
-                fresh_data = fetch_weather_for_location(save_to_file=True, output_path=save_path)
-            else:
-                logger.info("Kein passender Speicherpfad - nur im Speicher halten")
-                fresh_data = fetch_weather_for_location(save_to_file=False)
+            save_path = str(get_weather_json_path())
+            logger.info(f"Speichere Live-Daten nach {save_path}")
+            fresh_data = fetch_weather_for_location(save_to_file=True, output_path=save_path)
             
             if fresh_data:
                 # Extrahiere Uetliberg Daten
@@ -281,14 +263,10 @@ def get_evaluation_data():
             # 1. Stelle sicher, dass Wetterdaten existieren (lädt sie in Cache & /tmp)
             load_weather_data()
             
-            # 2. Prüfe ob Wetterdaten nun in /tmp liegen (durch load_weather_data erstellt)
-            weather_path = None
-            if os.path.exists('/tmp/wetterdaten.json'):
-                weather_path = '/tmp/wetterdaten.json'
-            elif Path("data/wetterdaten.json").exists():
-                weather_path = "data/wetterdaten.json"
+            # 2. Prüfe ob Wetterdaten nun existieren
+            weather_path = str(get_weather_json_path())
                 
-            if weather_path:
+            if Path(weather_path).exists():
                 from location_evaluator import LocationEvaluator
                 logger.info(f"Starte Evaluator mit Wetterdaten aus {weather_path}")
                 evaluator = LocationEvaluator(weather_json_path=weather_path)
@@ -302,10 +280,7 @@ def get_evaluation_data():
                     # group_by_json structure logic is duplicated here, better to reload file or construct dict
                     
                     # Versuche die neu erstellte Datei zu laden
-                    if os.path.exists('/tmp/evaluations.json'):
-                         evaluations_file = Path('/tmp/evaluations.json')
-                    elif Path("data/evaluations.json").exists():
-                         evaluations_file = Path("data/evaluations.json")
+                    evaluations_file = get_evaluations_json_path()
                          
         except Exception as e:
             logger.error(f"On-Demand-Generierung fehlgeschlagen: {e}")
@@ -424,11 +399,7 @@ def api_evaluation_raw():
     try:
         # Lade die rohen JSON-Daten direkt
         # Für Vercel: Verwende /tmp falls verfügbar, sonst data/
-        evaluations_file = None
-        if os.path.exists('/tmp') and Path('/tmp/evaluations.json').exists():
-            evaluations_file = Path('/tmp/evaluations.json')
-        elif Path("data/evaluations.json").exists():
-            evaluations_file = Path("data/evaluations.json")
+        evaluations_file = get_evaluations_json_path()
         
         if not evaluations_file or not evaluations_file.exists():
             # Gebe leeres Objekt zurück statt Fehler (Evaluierungen sind optional)
@@ -648,6 +619,32 @@ def api_cron():
         
     except Exception as e:
         logger.error(f"CRON: Fehler: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/trigger-update', methods=['POST'])
+def api_trigger_update():
+    """Manual trigger: Fetch weather, analyze, and send consolidated email."""
+    try:
+        from fetch_weather import fetch_weather_for_location
+        from location_evaluator import LocationEvaluator
+        
+        results = {'steps': {}}
+        
+        # 1. Fetch
+        weather_path = str(get_weather_json_path())
+        weather_data = fetch_weather_for_location(save_to_file=True, output_path=weather_path)
+        results['steps']['fetch'] = {'success': bool(weather_data)}
+        
+        # 2. Evaluate & Email (handled by evaluator)
+        evaluator = LocationEvaluator(weather_json_path=weather_path)
+        analysis_results = evaluator.analyze()
+        results['steps']['evaluate'] = {'success': bool(analysis_results)}
+        results['steps']['email'] = {'success': True, 'message': 'E-Mail wurde (falls konfiguriert) versendet'}
+        
+        results['success'] = True
+        return jsonify(results)
+    except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
 

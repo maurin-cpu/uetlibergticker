@@ -104,17 +104,12 @@ def fetch_weather_for_location(save_to_file=True, output_path=None):
         
         # Speichere als Dictionary mit Standortname als Key
         all_weather_data = {location['name']: location_entry}
+        print(all_weather_data)
         
         # Speichere in Datei falls gewünscht
         if save_to_file:
             if output_path is None:
-                # Für Vercel: Verwende /tmp falls verfügbar, sonst OUTPUT_DIR
-                if os.path.exists('/tmp'):
-                    output_dir = '/tmp'
-                else:
-                    output_dir = config.OUTPUT_DIR
-                    os.makedirs(output_dir, exist_ok=True)
-                json_filename = os.path.join(output_dir, config.WEATHER_JSON_FILENAME)
+                json_filename = str(config.get_weather_json_path())
             else:
                 json_filename = output_path
                 os.makedirs(os.path.dirname(json_filename), exist_ok=True)

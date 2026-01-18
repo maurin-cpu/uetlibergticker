@@ -7,7 +7,7 @@ from datetime import datetime
 import config
 
 # Konfiguration
-JSON_FILE_PATH = os.path.join(config.OUTPUT_DIR, config.WEATHER_JSON_FILENAME)
+JSON_FILE_PATH = str(config.get_weather_json_path())
 
 
 def load_weather_data(json_path):
@@ -57,16 +57,28 @@ def display_weather_for_location(location_name, weather_data):
     # Gruppiere nach Tagen
     days_data = {}
     for time_str, values in hourly_data.items():
-        dt = datetime.fromisoformat(time_str.replace("Z", "+00:00"))
-        date_key = dt.strftime("%Y-%m-%d")
-        if date_key not in days_data:
-            days_data[date_key] = []
-        days_data[date_key].append((time_str, values))
+        try:
+            # Handle both "2026-01-18T00:00Z" and "2026-01-18T00:00" formats
+            if time_str.endswith('Z'):
+                dt = datetime.fromisoformat(time_str.replace("Z", "+00:00"))
+            else:
+                dt = datetime.fromisoformat(time_str)
+            date_key = dt.strftime("%Y-%m-%d")
+            if date_key not in days_data:
+                days_data[date_key] = []
+            days_data[date_key].append((time_str, values))
+        except Exception as e:
+            print(f"[WARNING] Failed to parse timestamp {time_str}: {e}")
+            continue
     
     # Zeige alle Zeitstempel, gruppiert nach Tagen
     for date_key in sorted(days_data.keys()):
         day_timestamps = sorted(days_data[date_key], key=lambda x: x[0])
-        dt_first = datetime.fromisoformat(day_timestamps[0][0].replace("Z", "+00:00"))
+        first_timestamp = day_timestamps[0][0]
+        if first_timestamp.endswith('Z'):
+            dt_first = datetime.fromisoformat(first_timestamp.replace("Z", "+00:00"))
+        else:
+            dt_first = datetime.fromisoformat(first_timestamp)
         date_display = dt_first.strftime("%d.%m.%Y")
         
         print(f"\n{'='*80}")
@@ -74,7 +86,10 @@ def display_weather_for_location(location_name, weather_data):
         print(f"{'='*80}")
         
         for time_str, values in day_timestamps:
-            dt = datetime.fromisoformat(time_str.replace("Z", "+00:00"))
+            if time_str.endswith('Z'):
+                dt = datetime.fromisoformat(time_str.replace("Z", "+00:00"))
+            else:
+                dt = datetime.fromisoformat(time_str)
             time_display = dt.strftime("%H:%M")
             
             print(f"\nStandort: {location_name} | Zeitstempel: {time_display}")

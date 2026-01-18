@@ -26,7 +26,9 @@ from config import (
     LOCATION,
     FORECAST_DAYS,
     FLIGHT_HOURS_START,
-    FLIGHT_HOURS_END
+    FLIGHT_HOURS_END,
+    get_weather_json_path,
+    get_evaluations_json_path
 )
 
 try:
@@ -51,7 +53,8 @@ class Colors:
 class LocationEvaluator:
     """Evaluiert Flugbarkeit des Uetliberg Startplatzes basierend auf Wetterdaten."""
     
-    def __init__(self, weather_json_path: str = "data/wetterdaten.json", model: str = None):
+    def __init__(self, weather_json_path: str = None, model: str = None):
+        self.weather_json_path = weather_json_path or str(get_weather_json_path())
         self.weather_json_path = weather_json_path
         self.model = model or os.environ.get('OPENAI_MODEL', 'gpt-4o-mini')
         self.api_key = os.environ.get('OPENAI_API_KEY')
@@ -96,6 +99,17 @@ class LocationEvaluator:
                 self._save_evaluations_to_json(results)
             except Exception as e:
                 logger.warning(f"Fehler beim Speichern der Evaluierungen: {e}")
+            
+            # E-Mail-Benachrichtigung konsolidiert senden
+            if self.email_notifier:
+                try:
+                    success, error_msg = self.email_notifier.send_multi_day_alert(results, force_send=True)
+                    if not success and error_msg:
+                        logger.warning(f"E-Mail-Benachrichtigung fehlgeschlagen: {error_msg}")
+                    else:
+                        logger.info(f"Konsolidierte E-Mail-Benachrichtigung erfolgreich gesendet")
+                except Exception as e:
+                    logger.warning(f"Fehler beim Senden der konsolidierten E-Mail: {e}")
         
         return results
     
@@ -118,17 +132,6 @@ class LocationEvaluator:
             result['location'] = LOCATION['name']
             result['date'] = date
             result['timestamp'] = datetime.now().isoformat()
-            
-            # E-Mail-Benachrichtigung senden (immer, da force_send=True als Standard)
-            if self.email_notifier:
-                try:
-                    success, error_msg = self.email_notifier.send_alert(result, force_send=True)
-                    if not success and error_msg:
-                        logger.warning(f"E-Mail-Benachrichtigung fehlgeschlagen für {date}: {error_msg}")
-                    else:
-                        logger.info(f"E-Mail-Benachrichtigung erfolgreich gesendet für {date}")
-                except Exception as e:
-                    logger.warning(f"Fehler beim Senden der E-Mail-Benachrichtigung für {date}: {e}")
             
             return result
         except Exception as e:
@@ -446,14 +449,7 @@ class LocationEvaluator:
     
     def _save_evaluations_to_json(self, results: List[Dict]) -> None:
         """Speichert Evaluierungen in JSON-Datei."""
-        # Für Vercel: Verwende /tmp falls verfügbar, sonst data/
-        if os.path.exists('/tmp'):
-            data_dir = Path('/tmp')
-        else:
-            data_dir = Path("data")
-            data_dir.mkdir(exist_ok=True)
-        
-        evaluations_file = data_dir / "evaluations.json"
+        evaluations_file = get_evaluations_json_path()
         
         # Erstelle JSON-Struktur
         json_data = {

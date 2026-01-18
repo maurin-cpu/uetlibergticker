@@ -22,7 +22,7 @@ LOCATION = {
 # ============================================================================
 
 API_URL = "https://api.open-meteo.com/v1/forecast"
-API_MODEL = "best_match"
+API_MODEL = "meteoswiss_icon_ch1"  # MeteoSwiss ICON CH1 - supports cloud_base
 API_TIMEOUT = 30
 FORECAST_DAYS = 3
 TIMEZONE = "Europe/Zurich"
@@ -42,6 +42,43 @@ FLIGHT_HOURS_END = 18    # End-Stunde für Flugstunden (0-23, exklusiv)
 
 OUTPUT_DIR = "data"
 WEATHER_JSON_FILENAME = "wetterdaten.json"
+EVALUATIONS_FILENAME = "evaluations.json"
+
+def get_data_dir():
+    """
+    Gibt den Pfad zum Datenverzeichnis zurück.
+    Wählt /tmp auf Vercel, ansonsten den lokalen data/ Ordner.
+    """
+    import os
+    from pathlib import Path
+    
+    # 1. Höchste Priorität: Vercel-Umgebungsvariable
+    if os.environ.get('VERCEL') == '1':
+        return Path('/tmp')
+    
+    # 2. Sekundäre Prüfung: Falls wir auf einem Linux-System sind 
+    # und NICHT in einem typischen Windows-Projektpfad (kein Laufwerksbuchstabe im Root)
+    # UND das /tmp Verzeichnis existiert.
+    if os.name == 'posix' and os.path.exists('/tmp'):
+        # Verhindere, dass wir in WSL aus Versehen /tmp nutzen, 
+        # wenn wir eigentlich im Projektordner bleiben wollen.
+        # Auf Vercel ist der Pfad meist /var/task
+        if os.path.exists('/var/task') or not Path(__file__).absolute().as_posix().startswith('/mnt/'):
+            return Path('/tmp')
+    
+    # Lokal (Windows oder Linux-Entwicklung): Verwende den data/ Ordner im Projektroot
+    project_root = Path(__file__).parent.absolute()
+    data_dir = project_root / OUTPUT_DIR
+    data_dir.mkdir(exist_ok=True)
+    return data_dir
+
+def get_weather_json_path():
+    """Gibt den absoluten Pfad zur wetterdaten.json zurück."""
+    return get_data_dir() / WEATHER_JSON_FILENAME
+
+def get_evaluations_json_path():
+    """Gibt den absoluten Pfad zur evaluations.json zurück."""
+    return get_data_dir() / EVALUATIONS_FILENAME
 
 # ============================================================================
 # WETTERPARAMETER
@@ -72,22 +109,41 @@ HOURLY_PARAMS = [
 LLM_SYSTEM_PROMPT = """Du bist ein erfahrener Gleitschirm-Fluglehrer und Meteorologe mit 20+ Jahren Erfahrung in den Schweizer Alpen.
 Analysiere Wetterdaten für Gleitschirm-Startplätze und bewerte die Flugbarkeit.
 
-WICHTIG: 
-- Sicherheit hat höchste Priorität
-- Bei Zweifel: Nicht fliegbar
-- Berücksichtige lokale Besonderheiten (Luftraum, Topografie)
-- CAPE-Werte sind wichtig für Thermik-Einschätzung (>500 J/kg = gut, 200-500 = moderat, <200 = schwach)
-- Wolkenbasis (cloud_base) wichtig für Flughöhe
-- Antworte ausschliesslich mit gültigem JSON
+WICHTIG WIND-ANALYSE:
+- Gib WINDRICHTUNGS-RANGE an (z.B. "220-270°"), NICHT nur Start/Ende
+- Bewerte KONSISTENZ: Konstante Richtung = GUT, häufige Wechsel = SCHLECHT
+- 2-STUNDEN-REGEL: Wind muss nicht durchgehend passen, 2h aus guter Richtung reichen für Start
+- VOLATILITÄT: Abrupte Wechsel schlechter als graduelle Änderungen
+- BÖEN-WARNUNG: >30 km/h = VORSICHT, >40 km/h = GEFÄHRLICH (wichtiger als Windstärke!)
+
+WICHTIG WOLKEN-ANALYSE (Uetliberg 730m MSL):
+- LOW CLOUDS (0-2km MSL): ENTSCHEIDEND für Flugbarkeit
+  * Wolkenbasis <1000m = START UNMÖGLICH (Nebel/niedrige Wolken)
+  * Wolkenbasis 1000-2000m = FLIEGBAR
+  * Wolkenbasis >2000m = SEHR GUT (viel Thermikraum)
+- MID CLOUDS (2-6km MSL): Wetterstabilität-Indikator, wenig Einfluss auf Start
+- HIGH CLOUDS (>6km MSL): Wetterwechsel-Hinweis, schwächere Thermik möglich
+
+OPTIMALE BEWÖLKUNG:
+- Cumulus humilis (kleine Haufenwolken) + Blau dazwischen = FLIEGBAR
+- Wolkenbasis ideal: >1500-2000m AGL
+
+KRITISCHE BEWÖLKUNG:
+- Cumulonimbus (Türme, dunkle Basis) = LANDEN (Gewitter/Böen)
+- Geschlossener Stratus = KEINE THERMIK
+- Dichte Cirren = SCHWACHE THERMIK
 
 Bewerte nach folgenden Kriterien:
-1. Wind (Richtung in Grad, Stärke in km/h, Böen in km/h, Passt zur erlaubten Startrichtung?)
-2. Thermik-Potenzial (CAPE in J/kg, Sonnenscheindauer in Stunden, Bewölkung in %, Temperatur in °C)
-3. Wolkenbasis und Flughöhe (Wolkenbasis in Metern)
-4. Niederschlag und Sicht (Niederschlag in mm, Bewölkung in %)
-5. Luftraum-Einschränkungen (aus Bemerkungen)
+1. Wind (RANGE in Grad, Konsistenz, Volatilität, Böen-Gefahr, 2h-Fenster)
+2. Thermik-Potenzial (CAPE, Sonnenschein, Bewölkungstyp, Temperatur)
+3. Wolkenbasis (MSL-Höhe, kritische Schwellen für Uetliberg)
+4. Niederschlag und Sicht
+5. Luftraum-Einschränkungen
 6. Wetterentwicklung (nächste 3-6h)
-7. Lokale Gefahren (Rotoren, Lee, etc.)
+7. Lokale Gefahren
+
+WICHTIG: Sicherheit hat höchste Priorität - bei Zweifel: Nicht fliegbar!
+Antworte ausschliesslich mit gültigem JSON.
 
 WICHTIG: Gib IMMER konkrete Metriken/Zahlenwerte an wenn du diese in den Analysen erwähnst!
 
@@ -124,14 +180,22 @@ AKTUELLE WETTERDATEN (erste 6 Stunden):
 WETTERENTWICKLUNG:
 Es stehen {total_hours} Stunden Forecast-Daten zur Verfügung. Fokussiere auf die nächsten 3-6 Stunden für die Flugbarkeits-Entscheidung.
 
-HINWEISE: 
-- Nutze CAPE-Werte für Thermik-Bewertung (>500 J/kg = gute Thermik, 200-500 = moderat, <200 = schwach)
-- Berücksichtige Wolkenbasis für maximale Flughöhe
-- Prüfe ob Wind aus erlaubter Richtung kommt (siehe erlaubte Windrichtungen oben)
-- Beachte lokale Besonderheiten aus den Bemerkungen
-- Bei Unsicherheit: Sicherheitshalber als nicht fliegbar bewerten
-
 WICHTIG FÜR DIE ANALYSE:
+- WIND-RICHTUNG: Gib IMMER eine Range an (z.B. "Windrichtung dreht zwischen 220° und 270°")
+  * Bewerte Konsistenz: "Wind konstant aus 280-290°" = GUT vs. "Wind dreht wild in alle Richtungen" = SCHLECHT
+  * 2h-Regel: "Wind für 2 Stunden aus guter Richtung 270-290°, dann Drehung" → Bewerten ob Start möglich
+  * Volatilität: Abrupte Wechsel vs. graduelle Änderungen analysieren
+- BÖEN: KRITISCHE SCHWELLEN beachten!
+  * >30 km/h = VORSICHT (in Analyse erwähnen)
+  * >40 km/h = GEFÄHRLICH (macht gute Windstärke zunichte!)
+- WOLKENBASIS (Uetliberg 730m MSL):
+  * <900m MSL = START UNMÖGLICH
+  * 900-2000m MSL = FLIEGBAR  
+  * >2000m MSL = SEHR GUT
+- CLOUD COVER LAYERS analysieren:
+  * Low (0-2km): Entscheidend für Thermik am Start
+  * Mid (2-6km): Wetterstabilität
+  * High (>6km): Wetterwechsel/schwächere Thermik
 - Gib IMMER konkrete Metriken/Zahlenwerte an wenn du diese erwähnst:
   * Wind: Windrichtung in Grad (z.B. "294°"), Windgeschwindigkeit in km/h (z.B. "20.5 km/h"), Böen in km/h (z.B. "44.6 km/h")
   * Thermik: CAPE-Wert in J/kg (z.B. "150 J/kg"), Sonnenscheindauer in Stunden (z.B. "0 Stunden"), Bewölkung in % (z.B. "100%"), Temperatur in °C (z.B. "-2.6°C")
