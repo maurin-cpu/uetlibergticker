@@ -55,7 +55,6 @@ class LocationEvaluator:
     
     def __init__(self, weather_json_path: str = None, model: str = None):
         self.weather_json_path = weather_json_path or str(get_weather_json_path())
-        self.weather_json_path = weather_json_path
         self.model = model or os.environ.get('OPENAI_MODEL', 'gpt-4o-mini')
         self.api_key = os.environ.get('OPENAI_API_KEY')
         
