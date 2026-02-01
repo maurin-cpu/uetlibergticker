@@ -21,12 +21,13 @@ except ImportError:
     pass
 
 from config import (
-    LLM_SYSTEM_PROMPT, 
-    LLM_USER_PROMPT_TEMPLATE, 
+    LLM_SYSTEM_PROMPT,
+    LLM_USER_PROMPT_TEMPLATE,
     LOCATION,
     FORECAST_DAYS,
     FLIGHT_HOURS_START,
     FLIGHT_HOURS_END,
+    PRESSURE_LEVELS,
     get_weather_json_path,
     get_evaluations_json_path
 )
@@ -78,9 +79,10 @@ class LocationEvaluator:
         # Lade Wetterdaten für Uetliberg
         weather_data = self._load_weather_data()
         hourly_data = weather_data.get('hourly_data', {})
-        
+        pressure_level_data = weather_data.get('pressure_level_data', {})
+
         # Gruppiere nach Tagen und filtere Flugstunden
-        days_data = self._group_by_days(hourly_data)
+        days_data = self._group_by_days(hourly_data, pressure_level_data)
         
         # Sortiere Tage chronologisch und limitiere auf FORECAST_DAYS
         sorted_dates = sorted(days_data.keys())[:FORECAST_DAYS]
@@ -114,6 +116,9 @@ class LocationEvaluator:
     
     def analyze_day(self, day_data: Dict, date: str) -> Dict:
         """Analysiert einen einzelnen Tag."""
+        # Extrahiere Pressure-Level-Daten (spezieller Key)
+        pressure_level_data = day_data.pop('_pressure_levels', {})
+
         # Kombiniere mit Standort-Info aus config.py
         location_data = {
             'name': LOCATION['name'],
@@ -122,6 +127,7 @@ class LocationEvaluator:
             'windrichtung': LOCATION['windrichtung'],
             'bemerkung': LOCATION['bemerkung'],
             'hourly_data': day_data,
+            'pressure_level_data': pressure_level_data,
             'date': date
         }
 
@@ -162,8 +168,11 @@ class LocationEvaluator:
                 continue
         return filtered
     
-    def _group_by_days(self, hourly_data: Dict) -> Dict[str, Dict]:
+    def _group_by_days(self, hourly_data: Dict, pressure_level_data: Dict = None) -> Dict[str, Dict]:
         """Gruppiert Stunden-Daten nach Tagen und filtert auf Flugstunden."""
+        if pressure_level_data is None:
+            pressure_level_data = {}
+
         # Gruppiere zuerst nach Tagen
         days_data = {}
         for timestamp, data in hourly_data.items():
@@ -176,14 +185,27 @@ class LocationEvaluator:
             except Exception as e:
                 logger.warning(f"Fehler beim Gruppieren von {timestamp}: {e}")
                 continue
-        
+
+        # Gruppiere Pressure-Level-Daten nach Tagen
+        days_pl_data = {}
+        for timestamp, pl_data in pressure_level_data.items():
+            try:
+                dt = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+                date_key = dt.strftime("%Y-%m-%d")
+                if date_key not in days_pl_data:
+                    days_pl_data[date_key] = {}
+                days_pl_data[date_key][timestamp] = pl_data
+            except Exception:
+                continue
+
         # Filtere dann innerhalb jedes Tages auf Flugstunden
         filtered_days_data = {}
         for date_key, day_hourly_data in days_data.items():
             flight_hours_data = self._filter_flight_hours(day_hourly_data, FLIGHT_HOURS_START, FLIGHT_HOURS_END)
-            # Behalte auch Tage ohne Flugstunden-Daten (mit leerem Dict)
+            # Pressure-Level-Daten für diesen Tag anhängen (als spezieller Key)
+            flight_hours_data['_pressure_levels'] = days_pl_data.get(date_key, {})
             filtered_days_data[date_key] = flight_hours_data
-        
+
         return filtered_days_data
     
     def _load_weather_data(self) -> Dict:
@@ -218,7 +240,8 @@ class LocationEvaluator:
             wind_speed = data.get('wind_speed_10m', 'N/A')
             wind_dir = data.get('wind_direction_10m', 'N/A')
             wind_gusts = data.get('wind_gusts_10m', 'N/A')
-            cloud_base = data.get('cloud_base', 'N/A')
+            cloud_base_raw = data.get('cloud_base')
+            cloud_base = f"{cloud_base_raw}m" if cloud_base_raw is not None else 'wolkenfrei'
             cloud_cover = data.get('cloud_cover', 'N/A')
             cape = data.get('cape', 'N/A')
             precip = data.get('precipitation', 'N/A')
@@ -232,27 +255,68 @@ class LocationEvaluator:
             line = (
                 f"{time_str}: Temp {temp}°C | "
                 f"Wind {wind_speed}km/h aus {wind_dir}° (Böen {wind_gusts}km/h) | "
-                f"Wolkenbasis {cloud_base}m | Bewölkung {cloud_cover}% | "
+                f"Wolkenbasis {cloud_base} | Bewölkung {cloud_cover}% | "
                 f"CAPE {cape} J/kg | Niederschlag {precip}mm | Sonne {sunshine_str}"
             )
             lines.append(line)
         
         return "\n".join(lines)
     
+    def _format_altitude_wind_profile(self, pressure_level_data: Dict, hours: int = 6) -> str:
+        """Formatiert Höhenwind-Daten für LLM-Prompt."""
+        if not pressure_level_data:
+            return "Keine Höhenwind-Daten verfügbar"
+
+        sorted_times = sorted(pressure_level_data.keys())[:hours]
+        lines = []
+
+        for timestamp in sorted_times:
+            data = pressure_level_data[timestamp]
+            time_str = timestamp.replace('T', ' ')[:16]
+
+            altitude_data = []
+            for level in PRESSURE_LEVELS:
+                height = data.get(f'geopotential_height_{level}hPa')
+                wind_speed = data.get(f'wind_speed_{level}hPa')
+                wind_dir = data.get(f'wind_direction_{level}hPa')
+                temp = data.get(f'temperature_{level}hPa')
+
+                if height is not None and wind_speed is not None and isinstance(height, (int, float)):
+                    dir_str = f" aus {wind_dir:.0f}°" if wind_dir is not None else ""
+                    temp_str = f", Temp {temp:.1f}°C" if temp is not None else ""
+                    altitude_data.append(
+                        f"  {int(height)}m MSL ({level}hPa): Wind {wind_speed:.1f}km/h{dir_str}{temp_str}"
+                    )
+
+            if altitude_data:
+                lines.append(f"\n{time_str}:")
+                lines.extend(altitude_data)
+
+        return "\n".join(lines) if lines else "Keine Höhenwind-Daten verfügbar"
+
     def _build_prompt(self, location_data: Dict) -> Tuple[str, str]:
         """Erstellt System- und User-Prompt."""
         bemerkungen = location_data.get('bemerkung', '')
         bemerkungen_list = [b.strip() for b in bemerkungen.split('|') if b.strip()] if bemerkungen else []
-        
+
         hourly_data = location_data.get('hourly_data', {})
+        pressure_level_data = location_data.get('pressure_level_data', {})
         date = location_data.get('date', '')
-        
+
         # Formatiere alle verfügbaren Stunden (nicht nur 6)
         formatted_hours = self._format_hourly_data(hourly_data, hours=len(hourly_data))
-        
+
+        # Formatiere Höhenwind-Daten
+        formatted_altitude_wind = self._format_altitude_wind_profile(pressure_level_data, hours=6)
+
         # Erweitere User-Prompt um Flugstunden-Info
         flight_hours_info = f"\n\nWICHTIG: Diese Analyse bezieht sich nur auf Flugstunden ({FLIGHT_HOURS_START:02d}:00-{FLIGHT_HOURS_END:02d}:00) für {date}."
-        
+
+        # Höhenwind-Sektion
+        altitude_wind_section = ""
+        if formatted_altitude_wind != "Keine Höhenwind-Daten verfügbar":
+            altitude_wind_section = f"\n\nHÖHENWIND-PROFIL (erste 6 Stunden):\n{formatted_altitude_wind}\n\nAnalysiere das Höhenwindprofil auf Wind-Scherung und thermische Inversionen!"
+
         user_prompt = LLM_USER_PROMPT_TEMPLATE.format(
             name=location_data.get('name', 'N/A'),
             fluggebiet=location_data.get('fluggebiet', 'N/A'),
@@ -261,9 +325,11 @@ class LocationEvaluator:
             besonderheiten=', '.join(bemerkungen_list) if bemerkungen_list else 'Keine',
             hourly_data=formatted_hours,
             wind_check_info="",
-            total_hours=len(hourly_data)
-        ) + flight_hours_info
-        
+            total_hours=len(hourly_data),
+            flight_hours_start=FLIGHT_HOURS_START,
+            flight_hours_end=FLIGHT_HOURS_END
+        ) + flight_hours_info + altitude_wind_section
+
         return LLM_SYSTEM_PROMPT, user_prompt
     
     def _analyze_with_llm(self, location_data: Dict) -> Dict:
@@ -289,7 +355,7 @@ class LocationEvaluator:
         
         for attempt in range(max_retries):
             try:
-                response = requests.post(url, headers=headers, json=payload, timeout=30)
+                response = requests.post(url, headers=headers, json=payload, timeout=60)
                 
                 if response.status_code == 200:
                     return self._parse_llm_response(response.json())
@@ -342,6 +408,26 @@ class LocationEvaluator:
             result['summary'] = "Keine Zusammenfassung verfügbar"
         if 'recommendation' not in result:
             result['recommendation'] = "Keine Empfehlung verfügbar"
+        
+        # Parse und validiere stündliche Bewertungen
+        if 'hourly_evaluations' in result and isinstance(result['hourly_evaluations'], list):
+            # Validiere jede stündliche Bewertung
+            validated_hourly = []
+            for hourly_eval in result['hourly_evaluations']:
+                if isinstance(hourly_eval, dict):
+                    validated = {
+                        'hour': int(hourly_eval.get('hour', 0)),
+                        'timestamp': str(hourly_eval.get('timestamp', '')),
+                        'conditions': str(hourly_eval.get('conditions', 'UNKNOWN')).upper(),
+                        'flyable': bool(hourly_eval.get('flyable', False)),
+                        'rating': int(hourly_eval.get('rating', 0)),
+                        'reason': str(hourly_eval.get('reason', 'Keine Begründung'))
+                    }
+                    validated_hourly.append(validated)
+            result['hourly_evaluations'] = validated_hourly
+        else:
+            # Fallback: Leeres Array wenn nicht vorhanden
+            result['hourly_evaluations'] = []
         
         return result
     

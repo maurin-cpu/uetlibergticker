@@ -102,6 +102,26 @@ HOURLY_PARAMS = [
 ]
 
 # ============================================================================
+# HÖHENWIND-PARAMETER (Pressure Level Daten)
+# ============================================================================
+
+# Druckniveaus für Höhenwind-Daten (granularer für bessere Interpolation)
+# Alle 25 hPa für feinere Auflösung (ca. alle 200-250m Höhe)
+# 1000hPa≈0m, 975hPa≈250m, 950hPa≈500m, 925hPa≈750m, 900hPa≈1000m, 
+# 875hPa≈1250m, 850hPa≈1500m, 825hPa≈1750m, 800hPa≈2000m, 775hPa≈2250m, 750hPa≈2500m
+# Zusätzlich höhere Niveaus: 700hPa≈3000m, 600hPa≈4000m
+PRESSURE_LEVELS = [1000, 975, 950, 925, 900, 875, 850, 825, 800, 775, 750, 700, 600]
+
+PRESSURE_LEVEL_PARAMS = []
+for _level in PRESSURE_LEVELS:
+    PRESSURE_LEVEL_PARAMS.extend([
+        f"temperature_{_level}hPa",
+        f"wind_speed_{_level}hPa",
+        f"wind_direction_{_level}hPa",
+        f"geopotential_height_{_level}hPa"
+    ])
+
+# ============================================================================
 # LLM PROMPT-KONFIGURATION (für location_evaluator.py)
 # ============================================================================
 
@@ -117,6 +137,7 @@ WICHTIG WIND-ANALYSE:
 - BÖEN-WARNUNG: >30 km/h = VORSICHT, >40 km/h = GEFÄHRLICH (wichtiger als Windstärke!)
 
 WICHTIG WOLKEN-ANALYSE (Uetliberg 730m MSL):
+- Wolkenbasis "wolkenfrei" = KEINE WOLKEN vorhanden (= SEHR GUT, unbegrenzter Thermikraum)
 - LOW CLOUDS (0-2km MSL): ENTSCHEIDEND für Flugbarkeit
   * Wolkenbasis <1000m = START UNMÖGLICH (Nebel/niedrige Wolken)
   * Wolkenbasis 1000-2000m = FLIEGBAR
@@ -133,6 +154,16 @@ KRITISCHE BEWÖLKUNG:
 - Geschlossener Stratus = KEINE THERMIK
 - Dichte Cirren = SCHWACHE THERMIK
 
+WICHTIG HÖHENWIND-ANALYSE:
+- WIND-SCHERUNG: Große Geschwindigkeits-/Richtungsunterschiede zwischen Höhen = GEFÄHRLICH
+  * >10 km/h Unterschied pro 500m = VORSICHT
+  * >90° Richtungsänderung = TURBULENZ-RISIKO
+- THERMISCHE INVERSION: Temperaturanstieg mit Höhe = STABILE LUFTSCHICHTUNG
+  * Begrenzt Thermikentwicklung
+  * Typischerweise schlechte Thermikbedingungen
+- OPTIMAL: Gleichmäßiges Windprofil (Geschwindigkeit steigt sanft, Richtung konstant)
+- HÖHENWINDE: Starke Winde in der Höhe können auf Lee-Rotor oder Föhn hinweisen
+
 Bewerte nach folgenden Kriterien:
 1. Wind (RANGE in Grad, Konsistenz, Volatilität, Böen-Gefahr, 2h-Fenster)
 2. Thermik-Potenzial (CAPE, Sonnenschein, Bewölkungstyp, Temperatur)
@@ -147,24 +178,49 @@ Antworte ausschliesslich mit gültigem JSON.
 
 WICHTIG: Gib IMMER konkrete Metriken/Zahlenwerte an wenn du diese in den Analysen erwähnst!
 
+WICHTIG STÜNDLICHE BEWERTUNGEN:
+- Du MUSST für JEDE einzelne Stunde eine separate Bewertung abgeben
+- Bewerte jede Stunde einzeln basierend auf den Wetterdaten dieser Stunde
+- Gib für jede Stunde: conditions (EXCELLENT/GOOD/MODERATE/POOR/DANGEROUS), flyable (true/false), rating (1-10), reason (kurze Begründung)
+- Zusätzlich gibst du ein Gesamt-Fazit für den ganzen Tag
+
 Antworte IMMER mit folgendem JSON-Format (keine zusätzlichen Erklärungen):
 {
   "flyable": true/false,
   "rating": 1-10,
   "confidence": 1-10,
   "conditions": "EXCELLENT/GOOD/MODERATE/POOR/DANGEROUS",
-  "summary": "Kurze Zusammenfassung (1-2 Sätze)",
+  "summary": "Gesamt-Zusammenfassung für den ganzen Tag (1-2 Sätze)",
   "details": {
     "wind": "AUSFÜHRLICHE Wind-Analyse mit konkreten Metriken: Windrichtung in Grad, Windgeschwindigkeit in km/h, Böen in km/h, Bewertung",
     "thermik": "AUSFÜHRLICHE Thermik-Einschätzung mit konkreten Metriken: CAPE-Wert in J/kg, Sonnenscheindauer in Stunden, Bewölkung in %, Temperatur in °C",
     "risks": "AUSFÜHRLICHE Risiko-Analyse mit konkreten Metriken: Wolkenbasis in m, Bewölkung in %, Niederschlag in mm, Temperatur in °C, alle relevanten Zahlenwerte"
   },
-  "recommendation": "Konkrete Empfehlung für Piloten"
+  "recommendation": "Konkrete Empfehlung für Piloten",
+  "hourly_evaluations": [
+    {
+      "hour": 9,
+      "timestamp": "2026-01-04T09:00:00Z",
+      "conditions": "EXCELLENT/GOOD/MODERATE/POOR/DANGEROUS",
+      "flyable": true/false,
+      "rating": 1-10,
+      "reason": "Kurze Begründung für diese spezifische Stunde (z.B. 'Wind 15 km/h aus optimaler Richtung, gute Thermik erwartet')"
+    },
+    {
+      "hour": 10,
+      "timestamp": "2026-01-04T10:00:00Z",
+      "conditions": "EXCELLENT/GOOD/MODERATE/POOR/DANGEROUS",
+      "flyable": true/false,
+      "rating": 1-10,
+      "reason": "Kurze Begründung"
+    }
+    // ... für jede Stunde im Flugstunden-Zeitraum
+  ]
 }"""
 
 # User-Prompt Template (mit Platzhaltern für dynamische Werte)
 # Platzhalter: {name}, {fluggebiet}, {typ}, {windrichtung}, {besonderheiten}, 
-#              {hourly_data}, {wind_check_info}, {total_hours}
+#              {hourly_data}, {wind_check_info}, {total_hours}, {flight_hours_start}, {flight_hours_end}
 LLM_USER_PROMPT_TEMPLATE = """Analysiere die Flugbarkeit für folgenden Startplatz:
 
 STARTPLATZ-INFO:
@@ -172,6 +228,12 @@ Name: {name}
 Region: {fluggebiet}
 Typ: {typ}
 Erlaubte Windrichtungen: {windrichtung}
+
+WICHTIG - WINDRICHTUNGS-INTERPRETATION:
+- Einzelne Richtungen sind Punkte: N=0°/360°, NO=45°, O=90°, SO=135°, S=180°, SW=225°, W=270°, NW=315°
+- "{windrichtung}" ist eine RANGE (nicht eine einzelne Richtung!)
+- Beispiel "N-O": Dies bedeutet eine RANGE von Nord (0°/360°) bis Ost (90°)
+- Windrichtungen zwischen 0° und 90° liegen INNERHALB dieser erlaubten Range!
 Besonderheiten: {besonderheiten}
 
 AKTUELLE WETTERDATEN (erste 6 Stunden):
@@ -179,6 +241,12 @@ AKTUELLE WETTERDATEN (erste 6 Stunden):
 
 WETTERENTWICKLUNG:
 Es stehen {total_hours} Stunden Forecast-Daten zur Verfügung. Fokussiere auf die nächsten 3-6 Stunden für die Flugbarkeits-Entscheidung.
+
+WICHTIG: STÜNDLICHE BEWERTUNGEN ERFORDERLICH:
+- Du MUSST für JEDE einzelne Stunde im Flugstunden-Zeitraum ({flight_hours_start}:00-{flight_hours_end}:00) eine separate Bewertung abgeben
+- Bewerte jede Stunde einzeln basierend auf den Wetterdaten dieser spezifischen Stunde
+- Für jede Stunde gib an: conditions (EXCELLENT/GOOD/MODERATE/POOR/DANGEROUS), flyable (true/false), rating (1-10), reason (kurze Begründung)
+- Zusätzlich gibst du ein Gesamt-Fazit für den ganzen Tag (summary, details, recommendation)
 
 WICHTIG FÜR DIE ANALYSE:
 - WIND-RICHTUNG: Gib IMMER eine Range an (z.B. "Windrichtung dreht zwischen 220° und 270°")
