@@ -334,6 +334,13 @@ class LocationEvaluator:
     
     def _analyze_with_llm(self, location_data: Dict) -> Dict:
         """Sendet aufbereitete Daten an OpenAI GPT."""
+        # Prüfe API-Key
+        if not self.api_key:
+            raise ValueError("OPENAI_API_KEY nicht gesetzt")
+        
+        if not self.api_key.startswith('sk-'):
+            logger.warning(f"API-Key scheint ungültig zu sein (sollte mit 'sk-' beginnen)")
+        
         system_prompt, user_prompt = self._build_prompt(location_data)
         
         url = "https://api.openai.com/v1/chat/completions"
@@ -350,34 +357,54 @@ class LocationEvaluator:
         if any(model in self.model for model in json_supported_models):
             payload["response_format"] = {"type": "json_object"}
         
+        logger.info(f"OpenAI API Call: Model={self.model}, Prompt-Länge: System={len(system_prompt)}, User={len(user_prompt)}")
+        
         max_retries = 3
         retry_delay = 1
+        last_error = None
         
         for attempt in range(max_retries):
             try:
+                logger.debug(f"API Call Versuch {attempt + 1}/{max_retries}")
                 response = requests.post(url, headers=headers, json=payload, timeout=60)
                 
                 if response.status_code == 200:
+                    logger.info("OpenAI API Call erfolgreich")
                     return self._parse_llm_response(response.json())
                 elif response.status_code == 429:
                     wait_time = retry_delay * (2 ** attempt) * 2
-                    logger.warning(f"Rate limit, warte {wait_time}s")
+                    logger.warning(f"Rate limit (429), warte {wait_time}s vor Retry {attempt + 1}/{max_retries}")
                     time.sleep(wait_time)
                     continue
+                elif response.status_code == 401:
+                    error_msg = f"API Authentifizierungsfehler (401): Ungültiger API-Key? Response: {response.text[:200]}"
+                    logger.error(error_msg)
+                    raise Exception(error_msg)
                 else:
+                    error_text = response.text[:500] if response.text else "Keine Fehlermeldung"
+                    last_error = f"API Fehler {response.status_code}: {error_text}"
+                    logger.warning(f"{last_error} (Versuch {attempt + 1}/{max_retries})")
                     if attempt == max_retries - 1:
-                        raise Exception(f"API Fehler {response.status_code}: {response.text}")
+                        raise Exception(last_error)
                     time.sleep(retry_delay * (2 ** attempt))
             except requests.Timeout:
+                last_error = "OpenAI API Timeout nach 60 Sekunden"
+                logger.warning(f"{last_error} (Versuch {attempt + 1}/{max_retries})")
                 if attempt == max_retries - 1:
-                    raise Exception("OpenAI API Timeout")
+                    raise Exception(last_error)
                 time.sleep(retry_delay * (2 ** attempt))
             except requests.RequestException as e:
+                last_error = f"API Request-Fehler: {str(e)}"
+                logger.warning(f"{last_error} (Versuch {attempt + 1}/{max_retries})")
                 if attempt == max_retries - 1:
-                    raise Exception(f"API Request-Fehler: {str(e)}")
+                    raise Exception(last_error)
                 time.sleep(retry_delay * (2 ** attempt))
+            except Exception as e:
+                # Andere Exceptions (z.B. 401) direkt weiterwerfen
+                raise
         
-        raise Exception("OpenAI API Call fehlgeschlagen")
+        # Sollte eigentlich nie erreicht werden, aber als Fallback
+        raise Exception(f"OpenAI API Call fehlgeschlagen nach {max_retries} Versuchen. Letzter Fehler: {last_error}")
     
     def _parse_llm_response(self, response_json: Dict) -> Dict:
         """Extrahiert und validiert JSON aus LLM-Antwort."""

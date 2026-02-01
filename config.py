@@ -233,7 +233,14 @@ WICHTIG - WINDRICHTUNGS-INTERPRETATION:
 - Einzelne Richtungen sind Punkte: N=0°/360°, NO=45°, O=90°, SO=135°, S=180°, SW=225°, W=270°, NW=315°
 - "{windrichtung}" ist eine RANGE (nicht eine einzelne Richtung!)
 - Beispiel "N-O": Dies bedeutet eine RANGE von Nord (0°/360°) bis Ost (90°)
-- Windrichtungen zwischen 0° und 90° liegen INNERHALB dieser erlaubten Range!
+  * WICHTIG: Die Range geht NICHT über 360° hinaus!
+  * "N-O" bedeutet EXAKT: 0° bis 90° (nicht 337.5° bis 112.5°!)
+  * Windrichtungen zwischen 0° und 90° liegen INNERHALB dieser erlaubten Range!
+  * Windrichtungen außerhalb von 0°-90° liegen AUSSERHALB dieser Range!
+- Weitere Beispiele:
+  * "NO-SO" = 45° bis 135°
+  * "W-NW" = 270° bis 315°
+  * "N-NO" = 0° bis 45°
 Besonderheiten: {besonderheiten}
 
 AKTUELLE WETTERDATEN (erste 6 Stunden):
