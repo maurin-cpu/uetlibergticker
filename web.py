@@ -9,13 +9,30 @@ import os
 from datetime import datetime
 from pathlib import Path
 from flask import Flask, render_template, jsonify, request
+import config
 from config import (
-    FLIGHT_HOURS_START, 
-    FLIGHT_HOURS_END, 
-    LOCATION, 
-    get_weather_json_path, 
+    FLIGHT_HOURS_START,
+    FLIGHT_HOURS_END,
+    LOCATION,
+    PRESSURE_LEVELS,
+    get_weather_json_path,
     get_evaluations_json_path
 )
+
+# Original-Werte für Reset-Funktion speichern
+import copy
+_ORIGINAL_CONFIG = {
+    'LOCATION': copy.deepcopy(config.LOCATION),
+    'API_URL': config.API_URL,
+    'API_MODEL': config.API_MODEL,
+    'API_TIMEOUT': config.API_TIMEOUT,
+    'FORECAST_DAYS': config.FORECAST_DAYS,
+    'TIMEZONE': config.TIMEZONE,
+    'FLIGHT_HOURS_START': config.FLIGHT_HOURS_START,
+    'FLIGHT_HOURS_END': config.FLIGHT_HOURS_END,
+    'LLM_SYSTEM_PROMPT': config.LLM_SYSTEM_PROMPT,
+    'LLM_USER_PROMPT_TEMPLATE': config.LLM_USER_PROMPT_TEMPLATE,
+}
 
 # Lade .env Datei explizit
 try:
@@ -235,6 +252,40 @@ def format_data_for_charts(hourly_data):
     return chart_data
 
 
+def format_altitude_wind_for_charts(pressure_level_data):
+    """Formatiert Höhenwind-Daten für D3.js Altitude Profile Chart."""
+    chart_data = {'profiles': []}
+    sorted_times = sorted(pressure_level_data.keys())
+
+    for timestamp in sorted_times:
+        data = pressure_level_data[timestamp]
+        try:
+            dt = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+            profile = {'time': dt.isoformat(), 'levels': []}
+
+            for level in PRESSURE_LEVELS:
+                height = data.get(f'geopotential_height_{level}hPa')
+                wind_speed = data.get(f'wind_speed_{level}hPa')
+                wind_direction = data.get(f'wind_direction_{level}hPa')
+                temperature = data.get(f'temperature_{level}hPa')
+
+                if height is not None and wind_speed is not None:
+                    profile['levels'].append({
+                        'pressure': level,
+                        'altitude': height,
+                        'wind_speed': wind_speed,
+                        'wind_direction': wind_direction if wind_direction is not None else 0,
+                        'temperature': temperature if temperature is not None else 0
+                    })
+
+            if len(profile['levels']) >= 3:
+                chart_data['profiles'].append(profile)
+        except Exception:
+            continue
+
+    return chart_data
+
+
 def get_evaluation_data():
     """Lädt LLM-Auswertung aus evaluations.json oder generiert sie wenn nötig."""
     import logging
@@ -316,6 +367,151 @@ def get_evaluation_data():
 def index():
     """Hauptroute für das Web-Interface."""
     return render_template('weather_timeline.html')
+
+
+@app.route('/config')
+def config_page():
+    """Konfigurationsseite."""
+    return render_template('config.html')
+
+
+@app.route('/api/config', methods=['GET'])
+def api_config_get():
+    """Gibt aktuelle Konfigurationswerte als JSON zurück."""
+    return jsonify({
+        'success': True,
+        'config': {
+            'location': {
+                'name': config.LOCATION.get('name', ''),
+                'latitude': config.LOCATION.get('latitude', 0),
+                'longitude': config.LOCATION.get('longitude', 0),
+                'typ': config.LOCATION.get('typ', ''),
+                'fluggebiet': config.LOCATION.get('fluggebiet', ''),
+                'windrichtung': config.LOCATION.get('windrichtung', ''),
+                'bemerkung': config.LOCATION.get('bemerkung', ''),
+            },
+            'api': {
+                'url': config.API_URL,
+                'model': config.API_MODEL,
+                'timeout': config.API_TIMEOUT,
+                'forecast_days': config.FORECAST_DAYS,
+                'timezone': config.TIMEZONE,
+            },
+            'flight_hours': {
+                'start': config.FLIGHT_HOURS_START,
+                'end': config.FLIGHT_HOURS_END,
+            },
+            'llm': {
+                'system_prompt': config.LLM_SYSTEM_PROMPT,
+                'user_prompt_template': config.LLM_USER_PROMPT_TEMPLATE,
+            }
+        },
+        'original': _ORIGINAL_CONFIG
+    })
+
+
+@app.route('/api/config', methods=['POST'])
+def api_config_post():
+    """Übernimmt neue Konfigurationswerte (in-memory)."""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'error': 'Keine Daten empfangen'}), 400
+
+        _apply_config(data)
+        return jsonify({'success': True, 'message': 'Konfiguration gespeichert (Laufzeit)'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/config/apply', methods=['POST'])
+def api_config_apply():
+    """Übernimmt Config UND startet den gesamten Pipeline-Prozess."""
+    import logging
+    logger = logging.getLogger(__name__)
+    try:
+        data = request.get_json()
+        if data:
+            _apply_config(data)
+            logger.info("Config aktualisiert, starte Pipeline...")
+
+        # Pipeline: Wetter holen → Analyse → Email
+        from fetch_weather import fetch_weather_for_location as _fetch
+        from location_evaluator import LocationEvaluator
+
+        results = {'steps': {}}
+
+        # 1. Fetch
+        weather_path = str(get_weather_json_path())
+        weather_data = _fetch(save_to_file=True, output_path=weather_path)
+        results['steps']['fetch'] = {'success': bool(weather_data)}
+
+        # Cache invalidieren
+        global CACHED_WEATHER_DATA, LAST_FETCH_TIME
+        CACHED_WEATHER_DATA = None
+        LAST_FETCH_TIME = 0
+
+        # 2. Evaluate & Email
+        evaluator = LocationEvaluator(weather_json_path=weather_path)
+        analysis_results = evaluator.analyze()
+        results['steps']['evaluate'] = {'success': bool(analysis_results)}
+        results['steps']['email'] = {'success': True, 'message': 'E-Mail wurde (falls konfiguriert) versendet'}
+
+        results['success'] = True
+        return jsonify(results)
+    except Exception as e:
+        logger.error(f"Config-Apply Pipeline Fehler: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/config/reset', methods=['POST'])
+def api_config_reset():
+    """Setzt die Konfiguration auf die Originalwerte zurück."""
+    try:
+        config.LOCATION = copy.deepcopy(_ORIGINAL_CONFIG['LOCATION'])
+        config.API_URL = _ORIGINAL_CONFIG['API_URL']
+        config.API_MODEL = _ORIGINAL_CONFIG['API_MODEL']
+        config.API_TIMEOUT = _ORIGINAL_CONFIG['API_TIMEOUT']
+        config.FORECAST_DAYS = _ORIGINAL_CONFIG['FORECAST_DAYS']
+        config.TIMEZONE = _ORIGINAL_CONFIG['TIMEZONE']
+        config.FLIGHT_HOURS_START = _ORIGINAL_CONFIG['FLIGHT_HOURS_START']
+        config.FLIGHT_HOURS_END = _ORIGINAL_CONFIG['FLIGHT_HOURS_END']
+        config.LLM_SYSTEM_PROMPT = _ORIGINAL_CONFIG['LLM_SYSTEM_PROMPT']
+        config.LLM_USER_PROMPT_TEMPLATE = _ORIGINAL_CONFIG['LLM_USER_PROMPT_TEMPLATE']
+        return jsonify({'success': True, 'message': 'Konfiguration auf Originalwerte zurückgesetzt'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+def _apply_config(data):
+    """Wendet Konfigurationsdaten auf das config-Modul an."""
+    if 'location' in data:
+        loc = data['location']
+        if 'name' in loc: config.LOCATION['name'] = loc['name']
+        if 'latitude' in loc: config.LOCATION['latitude'] = float(loc['latitude'])
+        if 'longitude' in loc: config.LOCATION['longitude'] = float(loc['longitude'])
+        if 'typ' in loc: config.LOCATION['typ'] = loc['typ']
+        if 'fluggebiet' in loc: config.LOCATION['fluggebiet'] = loc['fluggebiet']
+        if 'windrichtung' in loc: config.LOCATION['windrichtung'] = loc['windrichtung']
+        if 'bemerkung' in loc: config.LOCATION['bemerkung'] = loc['bemerkung']
+
+    if 'api' in data:
+        api = data['api']
+        if 'url' in api: config.API_URL = api['url']
+        if 'model' in api: config.API_MODEL = api['model']
+        if 'timeout' in api: config.API_TIMEOUT = int(api['timeout'])
+        if 'forecast_days' in api: config.FORECAST_DAYS = int(api['forecast_days'])
+        if 'timezone' in api: config.TIMEZONE = api['timezone']
+
+    if 'flight_hours' in data:
+        fh = data['flight_hours']
+        if 'start' in fh: config.FLIGHT_HOURS_START = int(fh['start'])
+        if 'end' in fh: config.FLIGHT_HOURS_END = int(fh['end'])
+
+    if 'llm' in data:
+        llm = data['llm']
+        if 'system_prompt' in llm: config.LLM_SYSTEM_PROMPT = llm['system_prompt']
+        if 'user_prompt_template' in llm: config.LLM_USER_PROMPT_TEMPLATE = llm['user_prompt_template']
 
 
 @app.route('/api/weather')
@@ -418,6 +614,47 @@ def api_evaluation_raw():
             'evaluations': [],
             'last_updated': None
         })
+
+
+@app.route('/api/altitude-wind')
+def api_altitude_wind():
+    """API-Endpoint für Höhenwind-Daten (Pressure Level)."""
+    try:
+        weather_data = load_weather_data()
+        pressure_level_data = weather_data.get('pressure_level_data', {})
+
+        if not pressure_level_data:
+            return jsonify({
+                'success': False,
+                'error': 'Keine Höhenwind-Daten verfügbar',
+                'pressure_levels': PRESSURE_LEVELS,
+                'days': {},
+                'dates': []
+            })
+
+        # Filtere auf Flugstunden und gruppiere nach Tagen
+        flight_hours_pl = filter_flight_hours(pressure_level_data)
+        days_pl_data = group_by_days(flight_hours_pl)
+
+        days_formatted = {}
+        for date_key, day_pl_data in days_pl_data.items():
+            days_formatted[date_key] = format_altitude_wind_for_charts(day_pl_data)
+
+        sorted_dates = sorted(days_formatted.keys())
+
+        return jsonify({
+            'success': True,
+            'pressure_levels': PRESSURE_LEVELS,
+            'days': days_formatted,
+            'dates': sorted_dates
+        })
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"Fehler beim Laden der Höhenwind-Daten: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 
 @app.route('/api/email-config', methods=['GET'])

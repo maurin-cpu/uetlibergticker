@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Konfiguration - Uetliberg Ticker</title>
+    <style>
+        :root {
+            --color-primary: #6366F1;
+            --color-primary-light: #818CF8;
+            --color-success: #10B981;
+            --color-warning: #F59E0B;
+            --color-danger: #EF4444;
+            --color-bg: #0F172A;
+            --color-text: #F8FAFC;
+            --color-text-light: #94A3B8;
+            --color-border: rgba(255, 255, 255, 0.1);
+            --color-card: rgba(30, 41, 59, 0.7);
+            --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.1);
+            --glass-bg: rgba(30, 41, 59, 0.8);
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--color-bg);
+            color: var(--color-text);
+            line-height: 1.6;
+            padding: 16px;
+            background-image: radial-gradient(circle at 50% 0%, #1E293B 0%, #0F172A 100%);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        /* ========== HEADER ========== */
+        .page-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 28px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .page-header h1 {
+            font-size: 24px;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--color-primary-light), var(--color-primary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -0.5px;
+        }
+
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--color-text-light);
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 600;
+            padding: 8px 16px;
+            border-radius: 10px;
+            border: 1px solid var(--color-border);
+            background: var(--glass-bg);
+            transition: all 0.3s ease;
+        }
+
+        .back-link:hover {
+            color: var(--color-text);
+            border-color: var(--color-primary);
+            background: rgba(99, 102, 241, 0.1);
+        }
+
+        /* ========== SECTIONS ========== */
+        .config-section {
+            background: var(--color-card);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            margin-bottom: 20px;
+            box-shadow: var(--shadow-lg);
+            overflow: hidden;
+            transition: border-color 0.3s ease;
+        }
+
+        .config-section:hover {
+            border-color: rgba(99, 102, 241, 0.25);
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 20px;
+            cursor: pointer;
+            user-select: none;
+            transition: background 0.2s;
+        }
+
+        .section-header:hover {
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        .section-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 15px;
+            font-weight: 700;
+        }
+
+        .section-icon {
+            font-size: 18px;
+        }
+
+        .section-toggle {
+            font-size: 12px;
+            color: var(--color-text-light);
+            transition: transform 0.3s ease;
+        }
+
+        .section-toggle.collapsed {
+            transform: rotate(-90deg);
+        }
+
+        .section-body {
+            padding: 0 20px 20px 20px;
+            display: block;
+        }
+
+        .section-body.hidden {
+            display: none;
+        }
+
+        /* ========== FORM FIELDS ========== */
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 16px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .form-group.full-width {
+            grid-column: 1 / -1;
+        }
+
+        .form-group label {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--color-text-light);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid var(--color-border);
+            border-radius: 10px;
+            padding: 10px 14px;
+            color: var(--color-text);
+            font-size: 14px;
+            font-family: inherit;
+            outline: none;
+            transition: all 0.2s ease;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus,
+        .form-group select:focus {
+            border-color: var(--color-primary);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+        }
+
+        .form-group input[type="number"] {
+            -moz-appearance: textfield;
+            appearance: textfield;
+        }
+
+        .form-group textarea {
+            min-height: 120px;
+            resize: vertical;
+            font-family: 'Cascadia Code', 'Fira Code', monospace;
+            font-size: 12px;
+            line-height: 1.5;
+        }
+
+        .form-group textarea.tall {
+            min-height: 280px;
+        }
+
+        .form-hint {
+            font-size: 11px;
+            color: var(--color-text-light);
+            opacity: 0.7;
+        }
+
+        /* ========== ACTION BUTTONS ========== */
+        .action-bar {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-top: 8px;
+            padding: 20px;
+            background: var(--color-card);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            box-shadow: var(--shadow-lg);
+            position: sticky;
+            bottom: 16px;
+            z-index: 100;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+            color: white;
+            box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);
+            flex: 1;
+            justify-content: center;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(16, 185, 129, 0.4);
+        }
+
+        .btn-secondary {
+            background: rgba(99, 102, 241, 0.15);
+            color: var(--color-primary-light);
+            border: 1px solid rgba(99, 102, 241, 0.3);
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background: rgba(99, 102, 241, 0.25);
+            transform: translateY(-1px);
+        }
+
+        .btn-ghost {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--color-text-light);
+            border: 1px solid var(--color-border);
+        }
+
+        .btn-ghost:hover:not(:disabled) {
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--color-text);
+        }
+
+        /* ========== STATUS MESSAGE ========== */
+        .status-bar {
+            margin-top: 12px;
+            padding: 12px 16px;
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: 600;
+            display: none;
+            align-items: center;
+            gap: 8px;
+            animation: slideUp 0.3s ease;
+        }
+
+        .status-bar.success {
+            display: flex;
+            background: rgba(16, 185, 129, 0.15);
+            border: 1px solid rgba(16, 185, 129, 0.4);
+            color: #34D399;
+        }
+
+        .status-bar.error {
+            display: flex;
+            background: rgba(239, 68, 68, 0.15);
+            border: 1px solid rgba(239, 68, 68, 0.4);
+            color: #F87171;
+        }
+
+        .status-bar.loading {
+            display: flex;
+            background: rgba(99, 102, 241, 0.15);
+            border: 1px solid rgba(99, 102, 241, 0.4);
+            color: var(--color-primary-light);
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(8px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* ========== SPINNER ========== */
+        .spinner-small {
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255, 255, 255, 0.15);
+            border-top-color: currentColor;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* ========== PIPELINE PROGRESS ========== */
+        .pipeline-steps {
+            margin-top: 12px;
+        }
+
+        .pipeline-step {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 0;
+            font-size: 13px;
+            color: var(--color-text-light);
+        }
+
+        .pipeline-step .step-icon {
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            flex-shrink: 0;
+        }
+
+        .pipeline-step.pending .step-icon {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--color-border);
+        }
+
+        .pipeline-step.running .step-icon {
+            background: rgba(99, 102, 241, 0.2);
+            border: 1px solid var(--color-primary);
+            color: var(--color-primary-light);
+        }
+
+        .pipeline-step.done .step-icon {
+            background: rgba(16, 185, 129, 0.2);
+            border: 1px solid #10B981;
+            color: #34D399;
+        }
+
+        .pipeline-step.fail .step-icon {
+            background: rgba(239, 68, 68, 0.2);
+            border: 1px solid #EF4444;
+            color: #F87171;
+        }
+
+        @media (max-width: 640px) {
+            .page-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .action-bar {
+                flex-direction: column;
+            }
+
+            .btn {
+                justify-content: center;
+            }
+
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <!-- HEADER -->
+        <div class="page-header">
+            <h1>⚙ Konfiguration</h1>
+            <a href="/" class="back-link">← Zurueck zum Dashboard</a>
+        </div>
+
+        <!-- STANDORT -->
+        <div class="config-section" id="section-location">
+            <div class="section-header" onclick="toggleSection('location')">
+                <div class="section-title">
+                    <span class="section-icon">📍</span>
+                    Standort-Konfiguration
+                </div>
+                <span class="section-toggle" id="toggle-location">▼</span>
+            </div>
+            <div class="section-body" id="body-location">
+                <div class="form-grid">
+                    <div class="form-group full-width">
+                        <label for="loc-name">Name</label>
+                        <input type="text" id="loc-name" placeholder="z.B. Uetliberg - Startplatz Balderen">
+                    </div>
+                    <div class="form-group">
+                        <label for="loc-lat">Breitengrad (Latitude)</label>
+                        <input type="number" id="loc-lat" step="0.0001" placeholder="47.3226">
+                    </div>
+                    <div class="form-group">
+                        <label for="loc-lon">Laengengrad (Longitude)</label>
+                        <input type="number" id="loc-lon" step="0.0001" placeholder="8.5008">
+                    </div>
+                    <div class="form-group">
+                        <label for="loc-typ">Typ</label>
+                        <input type="text" id="loc-typ" placeholder="z.B. Startplatz">
+                    </div>
+                    <div class="form-group">
+                        <label for="loc-fluggebiet">Fluggebiet</label>
+                        <input type="text" id="loc-fluggebiet" placeholder="z.B. Uetliberg">
+                    </div>
+                    <div class="form-group">
+                        <label for="loc-windrichtung">Windrichtung</label>
+                        <input type="text" id="loc-windrichtung" placeholder="z.B. N-O">
+                        <span class="form-hint">Erlaubte Windrichtung fuer den Startplatz (z.B. N-O, SW-NW)</span>
+                    </div>
+                    <div class="form-group full-width">
+                        <label for="loc-bemerkung">Bemerkung</label>
+                        <textarea id="loc-bemerkung" rows="3" placeholder="Besonderheiten zum Startplatz..."></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- API -->
+        <div class="config-section" id="section-api">
+            <div class="section-header" onclick="toggleSection('api')">
+                <div class="section-title">
+                    <span class="section-icon">🌐</span>
+                    API-Konfiguration
+                </div>
+                <span class="section-toggle" id="toggle-api">▼</span>
+            </div>
+            <div class="section-body" id="body-api">
+                <div class="form-grid">
+                    <div class="form-group full-width">
+                        <label for="api-url">API URL</label>
+                        <input type="url" id="api-url" placeholder="https://api.open-meteo.com/v1/forecast">
+                    </div>
+                    <div class="form-group">
+                        <label for="api-model">Wettermodell</label>
+                        <input type="text" id="api-model" placeholder="meteoswiss_icon_ch1">
+                        <span class="form-hint">z.B. meteoswiss_icon_ch1, icon_seamless</span>
+                    </div>
+                    <div class="form-group">
+                        <label for="api-timeout">Timeout (Sek.)</label>
+                        <input type="number" id="api-timeout" min="5" max="120" placeholder="30">
+                    </div>
+                    <div class="form-group">
+                        <label for="api-forecast-days">Vorhersage-Tage</label>
+                        <input type="number" id="api-forecast-days" min="1" max="7" placeholder="3">
+                    </div>
+                    <div class="form-group">
+                        <label for="api-timezone">Zeitzone</label>
+                        <input type="text" id="api-timezone" placeholder="Europe/Zurich">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- FLUGSTUNDEN -->
+        <div class="config-section" id="section-flight">
+            <div class="section-header" onclick="toggleSection('flight')">
+                <div class="section-title">
+                    <span class="section-icon">🕐</span>
+                    Flugstunden
+                </div>
+                <span class="section-toggle" id="toggle-flight">▼</span>
+            </div>
+            <div class="section-body" id="body-flight">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="flight-start">Startzeit (Stunde)</label>
+                        <input type="number" id="flight-start" min="0" max="23" placeholder="9">
+                        <span class="form-hint">0-23, ab wann Flugstunden beginnen</span>
+                    </div>
+                    <div class="form-group">
+                        <label for="flight-end">Endzeit (Stunde)</label>
+                        <input type="number" id="flight-end" min="0" max="23" placeholder="18">
+                        <span class="form-hint">0-23, bis wann Flugstunden gehen (exklusiv)</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- LLM PROMPTS -->
+        <div class="config-section" id="section-llm">
+            <div class="section-header" onclick="toggleSection('llm')">
+                <div class="section-title">
+                    <span class="section-icon">🤖</span>
+                    LLM-Prompt Konfiguration
+                </div>
+                <span class="section-toggle collapsed" id="toggle-llm">▼</span>
+            </div>
+            <div class="section-body hidden" id="body-llm">
+                <div class="form-grid">
+                    <div class="form-group full-width">
+                        <label for="llm-system">System-Prompt</label>
+                        <textarea id="llm-system" class="tall"
+                            placeholder="System-Prompt fuer die KI-Analyse..."></textarea>
+                    </div>
+                    <div class="form-group full-width">
+                        <label for="llm-user">User-Prompt Template</label>
+                        <textarea id="llm-user" class="tall"
+                            placeholder="User-Prompt Template mit Platzhaltern..."></textarea>
+                        <span class="form-hint">Platzhalter: {name}, {fluggebiet}, {typ}, {windrichtung},
+                            {besonderheiten}, {hourly_data}, {total_hours}, {flight_hours_start},
+                            {flight_hours_end}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- STATUS MESSAGE -->
+        <div class="status-bar" id="status-bar"></div>
+
+        <!-- PIPELINE PROGRESS -->
+        <div class="pipeline-steps" id="pipeline-steps" style="display:none;">
+            <div class="pipeline-step pending" id="step-config">
+                <div class="step-icon">1</div>
+                <span>Konfiguration uebernehmen</span>
+            </div>
+            <div class="pipeline-step pending" id="step-fetch">
+                <div class="step-icon">2</div>
+                <span>Wetterdaten abrufen</span>
+            </div>
+            <div class="pipeline-step pending" id="step-evaluate">
+                <div class="step-icon">3</div>
+                <span>KI-Analyse durchfuehren</span>
+            </div>
+            <div class="pipeline-step pending" id="step-email">
+                <div class="step-icon">4</div>
+                <span>E-Mail versenden</span>
+            </div>
+        </div>
+
+        <!-- ACTION BAR -->
+        <div class="action-bar">
+            <button class="btn btn-primary" id="btn-apply" onclick="applyAndRun()">
+                🚀 Uebernehmen & Aktualisieren
+            </button>
+            <button class="btn btn-secondary" id="btn-save" onclick="saveOnly()">
+                💾 Nur speichern
+            </button>
+            <button class="btn btn-ghost" id="btn-reset" onclick="resetConfig()">
+                ↩ Zuruecksetzen
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // ========== TOGGLE SECTIONS ==========
+        function toggleSection(name) {
+            const body = document.getElementById('body-' + name);
+            const toggle = document.getElementById('toggle-' + name);
+            body.classList.toggle('hidden');
+            toggle.classList.toggle('collapsed');
+        }
+
+        // ========== LOAD CONFIG ==========
+        async function loadConfig() {
+            try {
+                const resp = await fetch('/api/config');
+                const data = await resp.json();
+                if (!data.success) throw new Error(data.error || 'Fehler beim Laden');
+
+                const c = data.config;
+
+                // Location
+                document.getElementById('loc-name').value = c.location.name || '';
+                document.getElementById('loc-lat').value = c.location.latitude || '';
+                document.getElementById('loc-lon').value = c.location.longitude || '';
+                document.getElementById('loc-typ').value = c.location.typ || '';
+                document.getElementById('loc-fluggebiet').value = c.location.fluggebiet || '';
+                document.getElementById('loc-windrichtung').value = c.location.windrichtung || '';
+                document.getElementById('loc-bemerkung').value = c.location.bemerkung || '';
+
+                // API
+                document.getElementById('api-url').value = c.api.url || '';
+                document.getElementById('api-model').value = c.api.model || '';
+                document.getElementById('api-timeout').value = c.api.timeout || '';
+                document.getElementById('api-forecast-days').value = c.api.forecast_days || '';
+                document.getElementById('api-timezone').value = c.api.timezone || '';
+
+                // Flight hours
+                document.getElementById('flight-start').value = c.flight_hours.start;
+                document.getElementById('flight-end').value = c.flight_hours.end;
+
+                // LLM Prompts
+                document.getElementById('llm-system').value = c.llm.system_prompt || '';
+                document.getElementById('llm-user').value = c.llm.user_prompt_template || '';
+
+            } catch (err) {
+                showStatus('error', 'Fehler beim Laden: ' + err.message);
+            }
+        }
+
+        // ========== COLLECT CONFIG ==========
+        function collectConfig() {
+            return {
+                location: {
+                    name: document.getElementById('loc-name').value,
+                    latitude: parseFloat(document.getElementById('loc-lat').value) || 0,
+                    longitude: parseFloat(document.getElementById('loc-lon').value) || 0,
+                    typ: document.getElementById('loc-typ').value,
+                    fluggebiet: document.getElementById('loc-fluggebiet').value,
+                    windrichtung: document.getElementById('loc-windrichtung').value,
+                    bemerkung: document.getElementById('loc-bemerkung').value,
+                },
+                api: {
+                    url: document.getElementById('api-url').value,
+                    model: document.getElementById('api-model').value,
+                    timeout: parseInt(document.getElementById('api-timeout').value) || 30,
+                    forecast_days: parseInt(document.getElementById('api-forecast-days').value) || 3,
+                    timezone: document.getElementById('api-timezone').value,
+                },
+                flight_hours: {
+                    start: parseInt(document.getElementById('flight-start').value) || 0,
+                    end: parseInt(document.getElementById('flight-end').value) || 23,
+                },
+                llm: {
+                    system_prompt: document.getElementById('llm-system').value,
+                    user_prompt_template: document.getElementById('llm-user').value,
+                }
+            };
+        }
+
+        // ========== SAVE ONLY ==========
+        async function saveOnly() {
+            const btns = disableButtons();
+            showStatus('loading', 'Speichere Konfiguration...');
+
+            try {
+                const resp = await fetch('/api/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(collectConfig())
+                });
+                const data = await resp.json();
+
+                if (data.success) {
+                    showStatus('success', '✓ ' + data.message);
+                } else {
+                    showStatus('error', '✗ ' + (data.error || 'Fehler'));
+                }
+            } catch (err) {
+                showStatus('error', '✗ Netzwerkfehler: ' + err.message);
+            } finally {
+                enableButtons(btns);
+            }
+        }
+
+        // ========== APPLY AND RUN PIPELINE ==========
+        async function applyAndRun() {
+            const btns = disableButtons();
+            const pipelineEl = document.getElementById('pipeline-steps');
+            pipelineEl.style.display = 'block';
+
+            // Reset pipeline steps
+            ['config', 'fetch', 'evaluate', 'email'].forEach(s => {
+                setPipelineStep(s, 'pending');
+            });
+
+            try {
+                // Step 1: Config uebernehmen
+                setPipelineStep('config', 'running');
+                showStatus('loading', 'Konfiguration wird uebernommen und Pipeline gestartet...');
+
+                const resp = await fetch('/api/config/apply', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(collectConfig())
+                });
+
+                setPipelineStep('config', 'done');
+
+                const data = await resp.json();
+
+                if (data.success) {
+                    // Update pipeline steps from response
+                    if (data.steps?.fetch?.success) {
+                        setPipelineStep('fetch', 'done');
+                    } else {
+                        setPipelineStep('fetch', 'fail');
+                    }
+
+                    if (data.steps?.evaluate?.success) {
+                        setPipelineStep('evaluate', 'done');
+                    } else {
+                        setPipelineStep('evaluate', 'fail');
+                    }
+
+                    if (data.steps?.email?.success) {
+                        setPipelineStep('email', 'done');
+                    } else {
+                        setPipelineStep('email', 'fail');
+                    }
+
+                    showStatus('success', '✓ Pipeline erfolgreich abgeschlossen! Seite wird aktualisiert...');
+
+                    // Redirect to dashboard after 2s
+                    setTimeout(() => { window.location.href = '/'; }, 2000);
+                } else {
+                    setPipelineStep('fetch', 'fail');
+                    showStatus('error', '✗ Pipeline-Fehler: ' + (data.error || 'Unbekannter Fehler'));
+                }
+            } catch (err) {
+                setPipelineStep('config', 'fail');
+                showStatus('error', '✗ Netzwerkfehler: ' + err.message);
+            } finally {
+                enableButtons(btns);
+            }
+        }
+
+        // ========== RESET ==========
+        async function resetConfig() {
+            if (!confirm('Konfiguration wirklich auf die Originalwerte zuruecksetzen?')) return;
+
+            const btns = disableButtons();
+            showStatus('loading', 'Setze zurueck...');
+
+            try {
+                const resp = await fetch('/api/config/reset', {
+                    method: 'POST'
+                });
+                const data = await resp.json();
+
+                if (data.success) {
+                    showStatus('success', '✓ ' + data.message);
+                    await loadConfig(); // Reload form values
+                } else {
+                    showStatus('error', '✗ ' + (data.error || 'Fehler'));
+                }
+            } catch (err) {
+                showStatus('error', '✗ Netzwerkfehler: ' + err.message);
+            } finally {
+                enableButtons(btns);
+            }
+        }
+
+        // ========== HELPERS ==========
+        function showStatus(type, message) {
+            const bar = document.getElementById('status-bar');
+            bar.className = 'status-bar ' + type;
+            if (type === 'loading') {
+                bar.innerHTML = '<div class="spinner-small"></div>' + message;
+            } else {
+                bar.textContent = message;
+            }
+        }
+
+        function setPipelineStep(name, state) {
+            const el = document.getElementById('step-' + name);
+            if (!el) return;
+            el.className = 'pipeline-step ' + state;
+            const icon = el.querySelector('.step-icon');
+            if (state === 'done') icon.textContent = '✓';
+            else if (state === 'fail') icon.textContent = '✗';
+            else if (state === 'running') icon.innerHTML = '<div class="spinner-small"></div>';
+        }
+
+        function disableButtons() {
+            const btns = document.querySelectorAll('.btn');
+            const states = [];
+            btns.forEach(b => { states.push(b.disabled); b.disabled = true; });
+            return states;
+        }
+
+        function enableButtons(states) {
+            const btns = document.querySelectorAll('.btn');
+            btns.forEach((b, i) => { b.disabled = states[i] || false; });
+        }
+
+        // ========== INIT ==========
+        loadConfig();
+    </script>
+</body>
+
+</html>

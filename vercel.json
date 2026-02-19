@@ -25,6 +25,22 @@
       "destination": "/api/index"
     },
     {
+      "source": "/api/altitude-wind",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/config",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/api/config/:path*",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/api/config",
+      "destination": "/api/index"
+    },
+    {
       "source": "/(.*)",
       "destination": "/api/index"
     }
@@ -32,7 +48,7 @@
   "crons": [
     {
       "path": "/api/auto-email",
-      "schedule": "40 18 * * *"
+      "schedule": "00 19 * * *"
     }
   ]
 }
