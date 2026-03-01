@@ -11,5 +11,7 @@
     },
     "author": "",
     "license": "ISC",
-    "dependencies": {}
+    "dependencies": {
+        "plotly.js-dist": "^3.4.0"
+    }
 }

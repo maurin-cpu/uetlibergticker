@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gleitschirm Emagramm & Rohdaten</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Plotly.js for plotting -->
+    <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border-left-color: #3b82f6;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+
+<body class="bg-gray-100 text-gray-800 min-h-screen">
+    <!-- Navbar -->
+    <nav class="bg-indigo-600 text-white shadow-lg p-4">
+        <div class="container mx-auto flex justify-between items-center">
+            <h1 class="text-2xl font-bold">🪂 Gleitschirm Emagramm</h1>
+            <div class="flex gap-4">
+                <a href="/meteo" class="text-indigo-200 hover:text-white transition">Meteogramm</a>
+                <a href="/regions" class="text-indigo-200 hover:text-white transition">Landkarte</a>
+                <a href="/raw-data" class="text-indigo-200 hover:text-white transition">Rohdaten</a>
+                <a href="/" class="text-indigo-200 hover:text-white transition">Dashboard</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="container mx-auto p-4 mt-6">
+
+        <div id="loading" class="flex flex-col items-center justify-center py-20">
+            <div class="spinner mb-4"></div>
+            <p class="text-gray-500 font-medium text-lg">Wetterdaten werden geladen...</p>
+        </div>
+
+        <div id="error-message" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4"
+            role="alert">
+            <strong class="font-bold">Fehler!</strong>
+            <span class="block sm:inline" id="error-text"></span>
+        </div>
+
+        <!-- 2 Column Layout -->
+        <div id="content" class="hidden flex flex-col md:flex-row gap-6">
+
+            <!-- Left Column: Plotly Emagramm -->
+            <div class="w-full md:w-2/3 bg-white p-4 rounded-xl shadow-md border border-gray-200">
+                <h2 class="text-xl font-bold text-gray-800 mb-2 border-b pb-2">Emagramm</h2>
+                <p class="text-sm text-gray-500 mb-4">Letzte Aktualisierung: <span id="timestamp"
+                        class="font-medium">-</span></p>
+                <div id="emagramm-plot" class="w-full h-[600px] border border-gray-300 rounded bg-gray-50"></div>
+            </div>
+
+            <!-- Right Column: Raw Data Table -->
+            <div class="w-full md:w-1/3 bg-white p-4 rounded-xl shadow-md border border-gray-200 flex flex-col">
+                <h2 class="text-xl font-bold text-gray-800 mb-2 border-b pb-2">Rohdaten</h2>
+                <div class="overflow-x-auto flex-grow">
+                    <table class="min-w-full text-sm text-left text-gray-600">
+                        <thead class="text-xs text-gray-700 uppercase bg-gray-100 border-b border-gray-300">
+                            <tr>
+                                <th scope="col" class="px-3 py-3 font-semibold">Druck (hPa)</th>
+                                <th scope="col" class="px-3 py-3 font-semibold">Temp (°C)</th>
+                                <th scope="col" class="px-3 py-3 font-semibold">Taupunkt (°C)</th>
+                                <th scope="col" class="px-3 py-3 font-semibold">RF (%)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="data-table-body" class="divide-y divide-gray-200">
+                            <!-- Rows inserted via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchEmagrammData();
+        });
+
+        async function fetchEmagrammData() {
+            try {
+                showLoading(true);
+                const response = await fetch('/api/emagramm-data');
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || `HTTP error! status: ${response.status}`);
+                }
+
+                if (data.success) {
+                    renderTable(data.data);
+                    renderEmagramm(data.data, data.thermal);
+                    document.getElementById('timestamp').textContent = data.timestamp;
+                    showLoading(false);
+                } else {
+                    throw new Error(data.error || "Unbekannter Fehler beim Laden");
+                }
+            } catch (error) {
+                console.error('Fetch error:', error);
+                showError(error.message);
+            }
+        }
+
+        function showLoading(isLoading) {
+            document.getElementById('loading').classList.toggle('hidden', !isLoading);
+            document.getElementById('content').classList.toggle('hidden', isLoading);
+            document.getElementById('error-message').classList.add('hidden');
+        }
+
+        function showError(message) {
+            document.getElementById('loading').classList.add('hidden');
+            document.getElementById('content').classList.add('hidden');
+            const errorDiv = document.getElementById('error-message');
+            errorDiv.classList.remove('hidden');
+            document.getElementById('error-text').textContent = message;
+        }
+
+        function renderTable(data) {
+            const tbody = document.getElementById('data-table-body');
+            tbody.innerHTML = '';
+
+            data.forEach((row, index) => {
+                const tr = document.createElement('tr');
+                tr.className = index % 2 === 0 ? 'bg-white hover:bg-gray-50' : 'bg-gray-50 hover:bg-gray-100';
+
+                tr.innerHTML = `
+                    <td class="px-3 py-2 font-medium text-gray-900">${row.pressure}</td>
+                    <td class="px-3 py-2 text-red-600 font-semibold">${row.temperature.toFixed(1)}</td>
+                    <td class="px-3 py-2 text-blue-600 font-semibold">${row.dewpoint.toFixed(1)}</td>
+                    <td class="px-3 py-2">${row.relative_humidity.toFixed(1)}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function renderEmagramm(dataArray, thermalData) {
+            // Emagramm is traditionally plotted with Pressure decreasing on Y-axis (log scale)
+            // X-axis is Temperature (linear), vertical lines are isotherms
+
+            // wir drehen das Array NICHT zwingend, aber Plotly zeichnet von links nach rechts/unten nach oben
+            // Y-Achse als "reversed" reicht.
+
+            const pressures = dataArray.map(d => d.pressure);
+            const temps = dataArray.map(d => d.temperature);
+            const dewpoints = dataArray.map(d => d.dewpoint);
+
+            const traceTemp = {
+                x: temps,
+                y: pressures,
+                mode: 'lines+markers',
+                name: 'Temperatur (°C)',
+                line: { color: '#ef4444', width: 3 }, // Red
+                marker: { size: 6, color: '#dc2626' }
+            };
+
+            const traceDew = {
+                x: dewpoints,
+                y: pressures,
+                mode: 'lines+markers',
+                name: 'Taupunkt (°C)',
+                line: { color: '#3b82f6', width: 3, dash: 'solid' }, // Blue
+                marker: { size: 6, color: '#2563eb' }
+            };
+
+            const plotData = [traceDew, traceTemp];
+
+            // Thermik-Kurve plotten
+            if (thermalData && !thermalData.error) {
+                if (thermalData.dry_adiabat) {
+                    const dryP = thermalData.dry_adiabat.map(d => d.p);
+                    const dryT = thermalData.dry_adiabat.map(d => d.t);
+                    plotData.push({
+                        x: dryT,
+                        y: dryP,
+                        mode: 'lines',
+                        name: 'Trockenadiabate',
+                        line: { color: '#f59e0b', width: 2, dash: 'dash' }
+                    });
+                }
+
+                if (thermalData.sat_adiabat) {
+                    const satP = thermalData.sat_adiabat.map(d => d.p);
+                    const satT = thermalData.sat_adiabat.map(d => d.t);
+                    plotData.push({
+                        x: satT,
+                        y: satP,
+                        mode: 'lines',
+                        name: 'Feuchtadiabate',
+                        line: { color: '#10b981', width: 2, dash: 'dashdot' }
+                    });
+                }
+
+                // LCL and Max Height marker
+                if (thermalData.lcl) {
+                    plotData.push({
+                        y: [thermalData.lcl_pressure, thermalData.lcl_pressure],
+                        x: [-30, 30],
+                        mode: 'lines',
+                        name: 'Wolkenbasis (LCL)',
+                        line: { color: '#6b7280', width: 1, dash: 'dot' }
+                    });
+                }
+            }
+
+            const layout = {
+                margin: { t: 40, r: 20, l: 60, b: 50 },
+                xaxis: {
+                    title: 'Temperatur (°C)',
+                    range: [-30, 30],
+                    dtick: 10,
+                    gridcolor: '#e5e7eb',
+                    zerolinecolor: '#9ca3af',
+                    zerolinewidth: 2
+                },
+                yaxis: {
+                    title: 'Luftdruck (hPa)',
+                    autorange: 'reversed', // Higher pressure at bottom
+                    type: 'log',           // Logarithmic scale for classical Emagramm
+                    range: [Math.log10(1000), Math.log10(500)], // Needs log bounds correctly, but autorange reversed handles usually well
+                    // To enforce explicit range on log axis in plotly:
+                    // range: [Math.log10(1000), Math.log10(500)]
+                    // However, autorange reversed + explicit log range needs manual bounds:
+                    range: [Math.log10(1000), Math.log10(500)],
+                    tickvals: [1000, 950, 900, 850, 800, 700, 600, 500],
+                    ticktext: ['1000', '950', '900', '850', '800', '700', '600', '500'],
+                    gridcolor: '#e5e7eb'
+                },
+                legend: {
+                    x: 0,
+                    y: 1,
+                    bgcolor: 'rgba(255, 255, 255, 0.8)',
+                    bordercolor: '#d1d5db',
+                    borderwidth: 1
+                },
+                height: 600,
+                paper_bgcolor: 'rgba(0,0,0,0)',
+                plot_bgcolor: 'rgba(0,0,0,0)'
+            };
+
+            // Workaround for Plotly log axis reversed explicit bounds
+            layout.yaxis.range = [Math.log10(1000), Math.log10(500)]; // 3 to ~2.69
+
+            // Background Dry Adiabats - Approximations for visual cue
+            const shapes = [];
+            // Isothermen (vertical lines) are handled by gridlines, but we want dry adiabats
+            // For a true emagramm, we just add some slanted lines manually if desired, but 
+            // since Plotly doesn't natively support SkewT/Emagram, exact adiabats require calculating curves!
+
+            // For now, we plot a clean classical T-log(P) chart (Emagramm) which is
+            // linear T on X, log P on Y. Dry adiabats are curves in this space.
+
+            Plotly.newPlot('emagramm-plot', plotData, layout, { responsive: true, displayModeBar: false });
+        }
+    </script>
+</body>
+
+</html>

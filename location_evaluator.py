@@ -20,6 +20,8 @@ try:
 except ImportError:
     pass
 
+from thermik_calculator import analyze_hour, calculate_thermal_profile, calculate_dewpoint
+
 from config import (
     LLM_SYSTEM_PROMPT,
     LLM_USER_PROMPT_TEMPLATE,
@@ -224,15 +226,18 @@ class LocationEvaluator:
         
         raise ValueError(f"Keine Wetterdaten für Uetliberg gefunden")
     
-    def _format_hourly_data(self, hourly_data: Dict, hours: int = 6) -> str:
-        """Formatiert stündliche Daten für Prompt."""
+    def _format_hourly_data(self, hourly_data: Dict, pressure_level_data: Dict = None, hours: int = 6) -> str:
+        """Formatiert stündliche Daten für Prompt inkl. Thermik-Berechnungen."""
         if not hourly_data:
             return "Keine stündlichen Daten verfügbar"
         
+        if pressure_level_data is None:
+            pressure_level_data = {}
+            
         sorted_times = sorted(hourly_data.keys())[:hours]
         lines = []
         
-        for timestamp in sorted_times:
+        for i, timestamp in enumerate(sorted_times):
             data = hourly_data[timestamp]
             time_str = timestamp.replace('T', ' ')[:16]
             
@@ -251,12 +256,52 @@ class LocationEvaluator:
                 sunshine_str = f"{sunshine / 3600:.1f}h"
             else:
                 sunshine_str = "0h"
+                
+            # Neues Top-Modell für Thermikberechnung nutzen
+            thermal_info = ""
+            try:
+                # Da die Daten in `analyze_hour` indiziert geparst werden, wir müssen die Dict-Listen Struktur annehmen.
+                # In den formatierten location_data structure haben wir bereits die Arrays pro Tag in `hourly_data`.
+                # Warte, timestamp iteriert über Keys. Sind keys strings oder ist hourly_data flach?
+                # Die groupbyday Methode behält timestamp string keys!
+                # Also müssen wir ein Pseudo-Dict bauen, das analyze_hour erwartet (Listen).
+                # Oder wir rufen `calculate_thermal_profile` direkt auf, da wir den Timestep schon extrahiert haben.
+                
+                # Bauen wir die extrahierten Arrays für diesen einen Timestep:
+                p_levels = []
+                for level in [1000, 975, 950, 925, 900, 875, 850, 825, 800, 775, 750, 700, 600]:
+                    h_val = pressure_level_data.get(timestamp, {}).get(f'geopotential_height_{level}hPa')
+                    t_val = pressure_level_data.get(timestamp, {}).get(f'temperature_{level}hPa')
+                    if h_val is not None and t_val is not None:
+                        p_levels.append({'pressure': level, 'height': h_val, 'temp': t_val})
+                
+                from thermik_calculator import calculate_thermal_profile, calculate_dewpoint
+                surf_dew = calculate_dewpoint(data.get('temperature_2m'), data.get('relative_humidity_2m', 50)) # fallback 50% wenn nicht vorhanden
+                
+                therm = calculate_thermal_profile(
+                    surface_temp=data.get('temperature_2m'),
+                    surface_dewpoint=surf_dew,
+                    elevation_m=850.0,
+                    pressure_levels_data=p_levels,
+                    boundary_layer_height_agl=data.get('boundary_layer_height'),
+                    sunshine_duration_s=data.get('sunshine_duration')
+                )
+                
+                if 'error' not in therm:
+                    climb = therm['climb_rate']
+                    max_h = therm['max_height']
+                    lcl = therm.get('lcl')
+                    lcl_str = f", LCL/Basis {lcl}m" if lcl else ""
+                    thermal_info = f" | THERMIK-PROXY: {climb} m/s bis {max_h}m MSL{lcl_str} (Güte: {therm['rating']}/10)"
+            except Exception as e:
+                thermal_info = f" | Thermik-Fehler: {e}"
             
             line = (
                 f"{time_str}: Temp {temp}°C | "
                 f"Wind {wind_speed}km/h aus {wind_dir}° (Böen {wind_gusts}km/h) | "
                 f"Wolkenbasis {cloud_base} | Bewölkung {cloud_cover}% | "
                 f"CAPE {cape} J/kg | Niederschlag {precip}mm | Sonne {sunshine_str}"
+                f"{thermal_info}"
             )
             lines.append(line)
         
@@ -304,7 +349,7 @@ class LocationEvaluator:
         date = location_data.get('date', '')
 
         # Formatiere alle verfügbaren Stunden (nicht nur 6)
-        formatted_hours = self._format_hourly_data(hourly_data, hours=len(hourly_data))
+        formatted_hours = self._format_hourly_data(hourly_data, pressure_level_data, hours=len(hourly_data))
 
         # Formatiere Höhenwind-Daten
         formatted_altitude_wind = self._format_altitude_wind_profile(pressure_level_data, hours=6)

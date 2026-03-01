@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meteogramm - Uetliberg</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        :root {
+            --color-primary: #6366F1;
+            --color-bg: #0F172A;
+            --color-text: #F8FAFC;
+            --color-text-light: #94A3B8;
+            --color-border: rgba(255, 255, 255, 0.1);
+            --color-card: rgba(30, 41, 59, 0.7);
+            --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.1);
+            --glass-bg: rgba(30, 41, 59, 0.8);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --card-radius: 20px;
+            --grid-line: rgba(255, 255, 255, 0.08);
+            --text-secondary: #94A3B8;
+            --text-muted: #64748B;
+            --accent: #6366F1;
+            --wind-ideal: #059669;
+            --wind-good: #10B981;
+            --wind-moderate: #D97706;
+            --wind-strong: #EA580C;
+            --wind-danger: #DC2626;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--color-bg);
+            color: var(--color-text);
+            line-height: 1.6;
+            min-height: 100vh;
+            background-image: radial-gradient(circle at 50% 0%, #1E293B 0%, #0F172A 100%);
+            padding: 16px;
+        }
+
+        .page-wrapper {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        /* ===== HEADER ===== */
+        .page-header {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .page-header h1 {
+            font-size: 26px;
+            font-weight: 700;
+            color: var(--color-text);
+            letter-spacing: -0.5px;
+        }
+
+        .page-header .subtitle {
+            font-size: 14px;
+            color: var(--color-text-light);
+            font-weight: 400;
+            margin-left: 12px;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .back-link {
+            padding: 10px 20px;
+            background: rgba(16, 185, 129, 0.2);
+            color: #34D399;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            text-decoration: none;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            transition: all 0.3s ease;
+        }
+
+        .back-link:hover {
+            background: rgba(16, 185, 129, 0.35);
+            transform: translateY(-2px);
+        }
+
+        .secondary-link {
+            padding: 10px 20px;
+            background: rgba(99, 102, 241, 0.2);
+            color: #818CF8;
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            text-decoration: none;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            transition: all 0.3s ease;
+        }
+
+        .secondary-link:hover {
+            background: rgba(99, 102, 241, 0.35);
+            transform: translateY(-2px);
+        }
+
+        /* ===== TAB NAVIGATION ===== */
+        .tab-bar {
+            display: flex;
+            gap: 4px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 3px;
+        }
+
+        .tab-btn {
+            padding: 7px 18px;
+            border: none;
+            background: transparent;
+            font-family: inherit;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--color-text-light);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .tab-btn:hover {
+            color: var(--color-text);
+        }
+
+        .tab-btn.active {
+            background: rgba(99, 102, 241, 0.3);
+            color: var(--color-text);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+        }
+
+        /* ===== MAIN CARD ===== */
+        .chart-card {
+            background: var(--color-card);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--card-radius);
+            box-shadow: var(--shadow-lg);
+            overflow: hidden;
+        }
+
+        .chart-container {
+            position: relative;
+            overflow-x: auto;
+            overflow-y: hidden;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        /* ===== LEGEND ===== */
+        .legend-bar {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+            padding: 14px 24px;
+            border-bottom: 1px solid var(--color-border);
+            flex-wrap: wrap;
+        }
+
+        .legend-section {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .legend-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--color-text-light);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .legend-scale {
+            display: flex;
+            align-items: center;
+            gap: 2px;
+        }
+
+        .legend-swatch {
+            width: 28px;
+            height: 14px;
+            border-radius: 3px;
+            position: relative;
+        }
+
+        .legend-swatch-label {
+            font-size: 10px;
+            color: var(--text-muted);
+            text-align: center;
+            width: 28px;
+        }
+
+        .legend-gradient {
+            width: 120px;
+            height: 14px;
+            border-radius: 3px;
+        }
+
+        .legend-gradient-labels {
+            display: flex;
+            justify-content: space-between;
+            width: 120px;
+        }
+
+        .legend-gradient-labels span {
+            font-size: 10px;
+            color: var(--text-muted);
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .legend-cloud-line {
+            width: 20px;
+            height: 2px;
+            border-top: 2px dashed #8B5CF6;
+        }
+
+        .legend-cloud-label {
+            font-size: 11px;
+            color: var(--color-text-light);
+        }
+
+        /* ===== SVG STYLES ===== */
+        .grid-line {
+            stroke: var(--grid-line);
+            stroke-width: 0.5;
+        }
+
+        .axis-label {
+            font-family: 'Inter', sans-serif;
+            font-size: 12px;
+            font-weight: 500;
+            fill: var(--color-text-light);
+        }
+
+        .time-label {
+            font-family: 'Inter', sans-serif;
+            font-size: 13px;
+            font-weight: 600;
+            fill: var(--color-text);
+        }
+
+        .wind-value {
+            font-family: 'Inter', sans-serif;
+            font-weight: 600;
+            dominant-baseline: central;
+            text-anchor: middle;
+            pointer-events: none;
+        }
+
+        .cloud-base-line {
+            stroke: #8B5CF6;
+            stroke-width: 2;
+            stroke-dasharray: 6 4;
+            fill: none;
+            opacity: 0.7;
+        }
+
+        .cloud-base-line-glow {
+            stroke: #8B5CF6;
+            stroke-width: 6;
+            stroke-dasharray: 6 4;
+            fill: none;
+            opacity: 0.15;
+        }
+
+        /* ===== GROUND STRIP ===== */
+        .ground-bg {
+            fill: rgba(255, 255, 255, 0.02);
+        }
+
+        .ground-divider {
+            stroke: var(--color-border);
+            stroke-width: 1;
+        }
+
+        .ground-label {
+            font-family: 'Inter', sans-serif;
+            font-size: 10px;
+            font-weight: 600;
+            fill: var(--color-text-light);
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        .ground-value {
+            font-family: 'Inter', sans-serif;
+            font-size: 11px;
+            font-weight: 600;
+            text-anchor: middle;
+        }
+
+        .ground-temp {
+            fill: #818CF8;
+        }
+
+        .ground-precip-bar {
+            opacity: 0.7;
+        }
+
+        /* ===== TOOLTIP ===== */
+        .tooltip {
+            position: absolute;
+            pointer-events: none;
+            background: var(--glass-bg);
+            backdrop-filter: blur(8px);
+            border-radius: 12px;
+            padding: 14px 16px;
+            box-shadow: var(--shadow-lg);
+            font-size: 12px;
+            line-height: 1.6;
+            opacity: 0;
+            transition: opacity 0.15s ease;
+            z-index: 100;
+            min-width: 180px;
+            border: 1px solid var(--glass-border);
+            color: var(--color-text);
+        }
+
+        .tooltip.visible {
+            opacity: 1;
+        }
+
+        .tooltip-title {
+            font-weight: 700;
+            font-size: 13px;
+            margin-bottom: 6px;
+            color: var(--color-text);
+        }
+
+        .tooltip-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 16px;
+        }
+
+        .tooltip-label {
+            color: var(--color-text-light);
+        }
+
+        .tooltip-value {
+            font-weight: 600;
+            color: var(--color-text);
+        }
+
+        .crosshair-v,
+        .crosshair-h {
+            stroke: var(--color-text);
+            stroke-width: 0.5;
+            opacity: 0;
+            transition: opacity 0.15s;
+            pointer-events: none;
+        }
+
+        .crosshair-v.visible,
+        .crosshair-h.visible {
+            opacity: 0.2;
+        }
+
+        /* ===== LOADING ===== */
+        .loading-state {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 400px;
+            color: var(--color-text-light);
+            font-size: 14px;
+        }
+
+        .spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(99, 102, 241, 0.2);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .error-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 400px;
+            color: var(--wind-danger);
+            font-size: 14px;
+            gap: 8px;
+        }
+
+        @media (max-width: 768px) {
+            .page-wrapper {
+                padding: 0;
+            }
+
+            body {
+                padding: 8px;
+            }
+
+            .page-header h1 {
+                font-size: 20px;
+            }
+
+            .page-header .subtitle {
+                display: none;
+            }
+
+            .legend-bar {
+                padding: 10px 16px;
+                gap: 16px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="page-wrapper">
+        <div class="page-header">
+            <div>
+                <h1 id="location-name">Meteogramm</h1>
+                <span class="subtitle" id="location-subtitle"></span>
+            </div>
+            <div class="header-right">
+                <div class="tab-bar" id="day-tabs"></div>
+                <a href="/regions" class="secondary-link">Landkarte</a>
+                <a href="/raw-data" class="secondary-link">Rohdaten</a>
+                <a href="/emagramm" class="secondary-link">Emagramm</a>
+                <a href="/" class="back-link">Dashboard</a>
+            </div>
+        </div>
+
+        <div class="chart-card">
+            <div class="legend-bar">
+                <div class="legend-section">
+                    <span class="legend-label">Wind</span>
+                    <div>
+                        <div class="legend-scale">
+                            <div class="legend-swatch" style="background:#059669"></div>
+                            <div class="legend-swatch" style="background:#10B981"></div>
+                            <div class="legend-swatch" style="background:#D97706"></div>
+                            <div class="legend-swatch" style="background:#EA580C"></div>
+                            <div class="legend-swatch" style="background:#DC2626"></div>
+                        </div>
+                        <div class="legend-scale">
+                            <div class="legend-swatch-label">0</div>
+                            <div class="legend-swatch-label">10</div>
+                            <div class="legend-swatch-label">20</div>
+                            <div class="legend-swatch-label">25</div>
+                            <div class="legend-swatch-label">30+</div>
+                        </div>
+                    </div>
+                    <span style="font-size:10px;color:var(--text-muted)">km/h</span>
+                </div>
+                <div class="legend-section">
+                    <span class="legend-label">Thermik</span>
+                    <div>
+                        <div class="legend-gradient"
+                            style="background:linear-gradient(to right, transparent, #FDE047, #FB923C, #F87171)"></div>
+                        <div class="legend-gradient-labels">
+                            <span>0</span>
+                            <span>300</span>
+                            <span>600+</span>
+                        </div>
+                    </div>
+                    <span style="font-size:10px;color:var(--text-muted)">CAPE J/kg</span>
+                </div>
+                <div class="legend-item">
+                    <svg width="20" height="20" viewBox="0 0 24 24" style="margin-top:-2px;">
+                        <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" fill="#F3F4F6" stroke="#4B5563"
+                            stroke-width="1.5"></path>
+                    </svg>
+                    <span class="legend-cloud-label" style="margin-left:4px;">Wolkenbasis</span>
+                </div>
+            </div>
+
+            <div class="chart-container" id="chart-container">
+                <div class="loading-state" id="loading">
+                    <div class="spinner"></div>
+                    Lade Wetterdaten...
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="tooltip" id="tooltip"></div>
+
+    <script src="/static/js/meteogram.js"></script>
+    <script>
+        (function () {
+            'use strict';
+
+            var weatherData = null;
+            var altWindData = null;
+            var currentDate = null;
+
+            async function loadData() {
+                try {
+                    var responses = await Promise.all([
+                        fetch('/api/weather'),
+                        fetch('/api/altitude-wind')
+                    ]);
+                    weatherData = await responses[0].json();
+                    altWindData = await responses[1].json();
+
+                    if (!weatherData.success || !altWindData.success) {
+                        showError('API-Fehler: ' + (weatherData.error || altWindData.error || 'Unbekannt'));
+                        return;
+                    }
+
+                    var dates = altWindData.dates || [];
+                    if (dates.length === 0) {
+                        showError('Keine Höhenwind-Daten verfügbar.');
+                        return;
+                    }
+
+                    document.getElementById('location-name').textContent =
+                        (weatherData.location && weatherData.location.name) || 'Meteogramm';
+                    document.getElementById('location-subtitle').textContent =
+                        weatherData.location.latitude.toFixed(2) + '°N, ' + weatherData.location.longitude.toFixed(2) + '°E';
+
+                    Meteogram.buildTabs(document.getElementById('day-tabs'), dates, function (d) {
+                        currentDate = d;
+                        render(d);
+                    });
+
+                    currentDate = dates[0];
+                    render(dates[0]);
+                } catch (e) {
+                    showError('Fehler beim Laden: ' + e.message);
+                }
+            }
+
+            function showError(msg) {
+                document.getElementById('chart-container').innerHTML =
+                    '<div class="error-state">' + msg + '</div>';
+            }
+
+            function render(date) {
+                Meteogram.renderChart(
+                    document.getElementById('chart-container'),
+                    document.getElementById('tooltip'),
+                    weatherData.days[date],
+                    altWindData.days[date],
+                    { date: date }
+                );
+            }
+
+            loadData();
+
+            window.addEventListener('resize', function () {
+                if (currentDate) render(currentDate);
+            });
+        })();
+    </script>
+</body>
+
+</html>

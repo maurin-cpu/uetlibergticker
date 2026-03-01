@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="de">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -57,6 +58,7 @@
                 opacity: 0;
                 transform: translateY(-20px);
             }
+
             to {
                 opacity: 1;
                 transform: translateY(0);
@@ -224,6 +226,7 @@
                 opacity: 0;
                 transform: translateY(30px);
             }
+
             to {
                 opacity: 1;
                 transform: translateY(0);
@@ -436,7 +439,7 @@
             overflow-x: auto;
             min-width: 100%;
         }
-        
+
         .bar-chart-container .bar-item {
             flex: 1;
             min-width: 50px;
@@ -605,9 +608,17 @@
             color: var(--color-text);
         }
 
-        .metric-value.wind-good { color: var(--color-success); }
-        .metric-value.wind-warning { color: var(--color-warning); }
-        .metric-value.wind-danger { color: var(--color-danger); }
+        .metric-value.wind-good {
+            color: var(--color-success);
+        }
+
+        .metric-value.wind-warning {
+            color: var(--color-warning);
+        }
+
+        .metric-value.wind-danger {
+            color: var(--color-danger);
+        }
 
         /* Windrichtungs-Pfeile */
         .wind-arrow-container {
@@ -661,7 +672,8 @@
         }
 
         /* Loading & Error */
-        .loading, .error {
+        .loading,
+        .error {
             text-align: center;
             padding: 60px 20px;
             font-size: 18px;
@@ -820,6 +832,7 @@
         }
     </style>
 </head>
+
 <body>
     <div class="container">
         <div class="header">
@@ -830,6 +843,15 @@
                         <span id="date-display">Lade Daten...</span>
                         <span>•</span>
                         <span id="time-window"></span>
+                        <a href="/meteo"
+                            style="margin-left: 15px; text-decoration: none; color: var(--color-primary); font-size: 14px; font-weight: 500;">Meteogramm</a>
+                        <a href="/regions"
+                            style="margin-left: 15px; text-decoration: none; color: var(--color-primary); font-size: 14px; font-weight: 500;">Landkarte</a>
+                        <a href="/emagramm"
+                            style="margin-left: 15px; text-decoration: none; color: var(--color-primary); font-size: 14px; font-weight: 500;">Emagramm</a>
+                        <a href="/raw-data"
+                            style="margin-left: 15px; text-decoration: none; color: var(--color-primary); font-size: 14px; font-weight: 500;">Rohdaten
+                            API</a>
                     </div>
                 </div>
                 <div class="summary-badge" id="summary-badge">
@@ -844,7 +866,8 @@
                     <div style="font-size: 24px; margin-bottom: 16px;">⏳</div>
                     <div style="font-size: 18px; font-weight: 600; margin-bottom: 8px;">Lade Wetterdaten...</div>
                     <div style="font-size: 14px; color: #6B7280;">Bitte warten Sie einen Moment</div>
-                    <div style="margin-top: 16px; font-size: 12px; color: #9CA3AF;" id="loading-status">Initialisiere...</div>
+                    <div style="margin-top: 16px; font-size: 12px; color: #9CA3AF;" id="loading-status">Initialisiere...
+                    </div>
                 </div>
             </div>
         </div>
@@ -884,16 +907,16 @@
                 if (loadingStatus) loadingStatus.textContent = msg;
                 console.log('[STATUS]', msg);
             };
-            
+
             try {
                 updateStatus('Starte Datenladung...');
                 console.log('[DEBUG] Starte Datenladung...');
                 console.log('[DEBUG] Flugstunden-Konfiguration:', FLIGHT_HOURS_START, '-', FLIGHT_HOURS_END);
-                
+
                 // Timeout für Fetch-Request (10 Sekunden)
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 10000);
-                
+
                 updateStatus('Lade JSON-Datei...');
                 let response;
                 try {
@@ -911,20 +934,20 @@
                     updateStatus('❌ Fehler beim Laden!');
                     throw fetchError;
                 }
-                
+
                 updateStatus('Parse JSON-Daten...');
-                
+
                 if (!response.ok) {
                     const errorMsg = `HTTP-Fehler: ${response.status} ${response.statusText}`;
                     console.error('[FEHLER]', errorMsg);
                     throw new Error(errorMsg);
                 }
-                
+
                 const data = await response.json();
                 updateStatus('Verarbeite Daten...');
                 console.log('[DEBUG] Daten geladen:', Object.keys(data));
                 console.log('[DEBUG] Anzahl Standorte:', Object.keys(data).length);
-                
+
                 const locationName = Object.keys(data)[0];
                 if (!locationName) {
                     const errorMsg = 'Keine Standorte in den Daten gefunden';
@@ -932,12 +955,12 @@
                     updateStatus('❌ ' + errorMsg);
                     throw new Error(errorMsg);
                 }
-                
+
                 weatherData = data[locationName];
                 console.log('[DEBUG] Standort:', locationName);
                 console.log('[DEBUG] Wetterdaten vorhanden:', !!weatherData);
                 console.log('[DEBUG] Stunden-Daten vorhanden:', !!(weatherData && weatherData.hourly_data));
-                
+
                 if (!weatherData || !weatherData.hourly_data) {
                     const errorMsg = 'Keine Wetterdaten gefunden';
                     console.error('[FEHLER]', errorMsg);
@@ -949,7 +972,7 @@
 
                 // Setze Header
                 document.getElementById('location-name').textContent = `Flugwetter ${locationName}`;
-                
+
                 // Finde ersten Tag mit Flugstunden
                 updateStatus('Suche Flugstunden...');
                 console.log('[DEBUG] Suche nach Flugstunden...');
@@ -960,21 +983,21 @@
                     console.error('[FEHLER] Verfügbare Zeitstempel:', Object.keys(weatherData.hourly_data).slice(0, 10));
                     throw new Error(errorMsg);
                 }
-                
+
                 console.log('[DEBUG] Tag gefunden:', firstDay.date, 'mit', firstDay.hours.length, 'Stunden');
-                
+
                 if (!firstDay.hours || firstDay.hours.length === 0) {
                     const errorMsg = 'Keine Stunden-Daten verfügbar';
                     console.error('[FEHLER]', errorMsg);
                     throw new Error(errorMsg);
                 }
-                
+
                 hoursData = firstDay.hours;
                 currentDate = firstDay.date;
-                
+
                 document.getElementById('date-display').textContent = formatDate(firstDay.date);
                 document.getElementById('time-window').textContent = `${FLIGHT_HOURS_START}:00 - ${FLIGHT_HOURS_END}:00 Uhr`;
-                
+
                 // Lade Evaluierungen aus JSON
                 updateStatus('Lade Evaluierungen...');
                 try {
@@ -986,7 +1009,7 @@
                         const evalData = await evalResponse.json();
                         evaluationsData = evalData;
                         console.log('[DEBUG] Evaluierungen geladen:', evalData.evaluations?.length || 0, 'Tage');
-                        
+
                         // Zeige Evaluierung für aktuellen Tag falls verfügbar
                         const currentEvaluation = evalData.evaluations?.find(e => e.date === firstDay.date);
                         if (currentEvaluation) {
@@ -999,27 +1022,27 @@
                     console.warn('[WARNUNG] Fehler beim Laden der Evaluierungen:', evalError);
                     // Evaluierungen sind optional, fahre fort
                 }
-                
+
                 const summary = generateSummary(firstDay.hours);
                 document.getElementById('summary-text').textContent = summary.text;
                 document.getElementById('summary-badge').className = `summary-badge ${summary.type}`;
-                
+
                 // Erstelle Visualisierungen
                 updateStatus('Erstelle Visualisierungen...');
                 console.log('[DEBUG] Erstelle Visualisierungen...');
                 createCharts(firstDay.hours);
                 createHourCards(firstDay.hours);
-                
+
                 updateStatus('✅ Fertig!');
                 console.log('[DEBUG] Dashboard erfolgreich erstellt');
             } catch (error) {
                 console.error('[FEHLER]', error);
                 console.error('[FEHLER] Stack:', error.stack);
-                
+
                 // Zeige Fehler in der UI
                 const chartsSection = document.getElementById('charts-section');
                 if (chartsSection) {
-                    chartsSection.innerHTML = 
+                    chartsSection.innerHTML =
                         `<div class="error">
                             <strong>Fehler beim Laden der Wetterdaten:</strong><br>
                             ${error.message}<br>
@@ -1029,7 +1052,7 @@
                         </div>`;
                 } else {
                     // Falls charts-section nicht existiert, zeige Fehler im Body
-                    document.body.innerHTML = 
+                    document.body.innerHTML =
                         `<div style="padding: 20px; color: red;">
                             <h1>Fehler beim Laden</h1>
                             <p>${error.message}</p>
@@ -1042,7 +1065,7 @@
         function getFirstFlightDay(hourlyData) {
             console.log('[DEBUG] getFirstFlightDay: Verarbeite', Object.keys(hourlyData).length, 'Zeitstempel');
             const days = {};
-            
+
             for (const [timestamp, data] of Object.entries(hourlyData)) {
                 try {
                     // Parse Zeitstempel - füge Zeitzone hinzu falls fehlt
@@ -1054,12 +1077,12 @@
                         // Keine Zeitzone - füge UTC hinzu für konsistente Parsing
                         dt = new Date(timestamp + 'Z');
                     }
-                    
+
                     if (isNaN(dt.getTime())) {
                         console.warn('[WARNUNG] Ungültiger Zeitstempel:', timestamp);
                         continue;
                     }
-                    
+
                     // Verwende lokale Zeit für Datum und Stunde
                     // JavaScript konvertiert UTC-Zeitstempel automatisch in lokale Zeit
                     const localDate = new Date(dt.getTime());
@@ -1068,18 +1091,18 @@
                     const month = String(localDate.getMonth() + 1).padStart(2, '0');
                     const day = String(localDate.getDate()).padStart(2, '0');
                     const dateKey = `${year}-${month}-${day}`;
-                    
+
                     if (!days[dateKey]) {
                         days[dateKey] = [];
                     }
-                    
+
                     // Hole Stunde aus lokaler Zeit (da FLIGHT_HOURS_START/END in lokaler Zeit sind)
                     const hour = localDate.getHours();
                     // Reduziere Logs für Performance (nur erste 3 Zeitstempel)
                     if (Object.keys(days).length === 0 && Object.values(days).flat().length < 3) {
                         console.log('[DEBUG] Zeitstempel:', timestamp, '-> Lokale Zeit:', localDate.toLocaleString('de-CH'), 'Stunde:', hour);
                     }
-                    
+
                     if (hour >= FLIGHT_HOURS_START && hour < FLIGHT_HOURS_END) {
                         days[dateKey].push({ timestamp, data, hour });
                     }
@@ -1087,10 +1110,10 @@
                     console.warn('[WARNUNG] Fehler beim Verarbeiten von', timestamp, ':', e);
                 }
             }
-            
+
             console.log('[DEBUG] Gefundene Tage:', Object.keys(days));
             console.log('[DEBUG] Tage mit Flugstunden:', Object.keys(days).map(d => ({ date: d, count: days[d].length })));
-            
+
             const sortedDates = Object.keys(days).sort();
             for (const date of sortedDates) {
                 if (days[date].length > 0) {
@@ -1099,18 +1122,18 @@
                     return { date, hours: days[date] };
                 }
             }
-            
+
             console.warn('[WARNUNG] Kein Tag mit Flugstunden gefunden');
             return null;
         }
 
         function formatDate(dateStr) {
             const dt = new Date(dateStr + 'T12:00:00');
-            return dt.toLocaleDateString('de-CH', { 
-                weekday: 'long', 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric' 
+            return dt.toLocaleDateString('de-CH', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
             });
         }
 
@@ -1118,10 +1141,10 @@
             const windSpeeds = hours.map(h => h.data.wind_speed_10m || 0);
             const precip = hours.some(h => (h.data.precipitation || 0) > 0);
             const avgWind = windSpeeds.reduce((a, b) => a + b, 0) / windSpeeds.length;
-            
+
             let text = '';
             let type = 'good';
-            
+
             if (precip) {
                 text = '⚠️ Niederschlag erwartet';
                 type = 'danger';
@@ -1135,7 +1158,7 @@
                 text = '✓ Gute Flugbedingungen';
                 type = 'good';
             }
-            
+
             return { text, type };
         }
 
@@ -1143,7 +1166,7 @@
             // Erstelle Evaluierungs-Sektion im Header
             const headerTop = document.querySelector('.header-top');
             if (!headerTop) return;
-            
+
             // Prüfe ob Evaluierungs-Badge bereits existiert
             let evalBadge = document.getElementById('evaluation-badge');
             if (!evalBadge) {
@@ -1152,22 +1175,22 @@
                 evalBadge.className = 'evaluation-badge';
                 headerTop.appendChild(evalBadge);
             }
-            
+
             const flyable = evaluation.flyable;
             const conditions = evaluation.conditions || 'UNKNOWN';
             const rating = evaluation.rating || 0;
             const summary = evaluation.summary || '';
-            
+
             // Bestimme Badge-Farbe basierend auf Bedingungen
             let badgeClass = 'evaluation-good';
             if (conditions === 'EXCELLENT') badgeClass = 'evaluation-excellent';
             else if (conditions === 'GOOD') badgeClass = 'evaluation-good';
             else if (conditions === 'MODERATE') badgeClass = 'evaluation-moderate';
             else if (conditions === 'POOR' || conditions === 'DANGEROUS') badgeClass = 'evaluation-danger';
-            
+
             const flyableText = flyable ? '✓ FLUGBAR' : '✗ NICHT FLUGBAR';
             const ratingStars = '⭐'.repeat(Math.min(rating, 10));
-            
+
             evalBadge.innerHTML = `
                 <div class="evaluation-header">
                     <span class="evaluation-flyable ${flyable ? 'flyable-yes' : 'flyable-no'}">${flyableText}</span>
@@ -1189,19 +1212,19 @@
         function createCharts(hours) {
             const container = document.getElementById('charts-section');
             container.innerHTML = '';
-            
+
             // Berechne gemeinsame Breite für alle Charts
             const chartWidth = calculateChartWidth(hours);
 
             // Wind Chart
             createWindChart(hours, container, chartWidth);
-            
+
             // Niederschlag Chart
             createPrecipitationChart(hours, container, chartWidth);
-            
+
             // Thermik Chart
             createThermikChart(hours, container, chartWidth);
-            
+
             // Wolkenbasis Chart
             createCloudChart(hours, container, chartWidth);
         }
@@ -1209,24 +1232,24 @@
         function createWindChart(hours, container, chartWidth) {
             const chartDiv = document.createElement('div');
             chartDiv.className = 'chart-container';
-            
+
             const values = hours.map(h => h.data.wind_speed_10m || 0);
             const maxValue = Math.max(...values, 1);
             const avgValue = values.reduce((a, b) => a + b, 0) / values.length;
-            
+
             const chartHeight = 60;
             const containerWidth = chartWidth;
-            
+
             // Berechne Positionen für alle Punkte
             const points = hours.map((h, i) => {
                 const speed = h.data.wind_speed_10m || 0;
                 const x = hours.length > 1 ? (i / (hours.length - 1)) * 100 : 50;
                 const y = chartHeight - ((speed / maxValue) * (chartHeight - 10));
-                
+
                 let colorClass = 'wind-good';
                 if (speed > 30) colorClass = 'wind-danger';
                 else if (speed > 20) colorClass = 'wind-warning';
-                
+
                 return {
                     x: x,
                     y: y,
@@ -1237,7 +1260,7 @@
                     index: i
                 };
             });
-            
+
             // Erstelle Linien-Segmente zwischen Punkten
             const lineSegments = [];
             for (let i = 0; i < points.length - 1; i++) {
@@ -1248,7 +1271,7 @@
                 // Berechne Länge in Pixeln basierend auf Container-Breite
                 const lengthPx = Math.sqrt((dx * containerWidth / 100) ** 2 + dy ** 2);
                 const angle = Math.atan2(dy, dx * containerWidth / 100) * 180 / Math.PI;
-                
+
                 lineSegments.push({
                     left: p1.x + '%',
                     top: p1.y + 'px',
@@ -1256,7 +1279,7 @@
                     angle: angle
                 });
             }
-            
+
             chartDiv.innerHTML = `
                 <div class="chart-header">
                     <div class="chart-title">💨 Wind</div>
@@ -1286,20 +1309,20 @@
                     </div>
                 </div>
             `;
-            
+
             container.appendChild(chartDiv);
         }
 
         function createPrecipitationChart(hours, container, chartWidth) {
             const chartDiv = document.createElement('div');
             chartDiv.className = 'chart-container';
-            
+
             const values = hours.map(h => h.data.precipitation || 0);
             const maxValue = Math.max(...values, 1);
-            
+
             // Verwende übergebene Chart-Breite
             const containerWidth = chartWidth;
-            
+
             chartDiv.innerHTML = `
                 <div class="chart-header">
                     <div class="chart-title">🌧️ Niederschlag</div>
@@ -1307,23 +1330,23 @@
                 </div>
                 <div class="bar-chart-container" style="width: ${containerWidth}px;">
                     ${hours.map((h, i) => {
-                        const precip = h.data.precipitation || 0;
-                        const height = (precip / maxValue) * 100;
-                        const hasStorm = h.data.precipitation_probability > 70 && precip > 2;
-                        return `<div class="bar-item ${precip > 0 ? 'has-precipitation' : ''} ${hasStorm ? 'has-storm' : ''}" style="height: ${Math.max(height, 2)}%" data-hour-index="${i}" title="${h.hour}:00 - ${precip.toFixed(1)}mm">
+                const precip = h.data.precipitation || 0;
+                const height = (precip / maxValue) * 100;
+                const hasStorm = h.data.precipitation_probability > 70 && precip > 2;
+                return `<div class="bar-item ${precip > 0 ? 'has-precipitation' : ''} ${hasStorm ? 'has-storm' : ''}" style="height: ${Math.max(height, 2)}%" data-hour-index="${i}" title="${h.hour}:00 - ${precip.toFixed(1)}mm">
                             <div style="position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%); font-size: 9px; color: #6B7280; font-weight: 600; white-space: nowrap;">${h.hour}:00</div>
                         </div>`;
-                    }).join('')}
+            }).join('')}
                 </div>
             `;
-            
+
             container.appendChild(chartDiv);
         }
 
         function createThermikChart(hours, container, chartWidth) {
             const chartDiv = document.createElement('div');
             chartDiv.className = 'chart-container';
-            
+
             // Berechne Steigraten
             const liftRates = hours.map(h => {
                 const cape = h.data.cape || 0;
@@ -1339,22 +1362,22 @@
                 if (sunshine > 0) liftRate *= 1.2;
                 return Math.min(5, Math.max(0, liftRate));
             });
-            
+
             const maxValue = Math.max(...liftRates, 1);
             const avgValue = liftRates.reduce((a, b) => a + b, 0) / liftRates.length;
-            
+
             const chartHeight = 40;
             const containerWidth = chartWidth;
-            
+
             // Berechne Positionen für alle Punkte
             const points = liftRates.map((rate, i) => {
                 const x = liftRates.length > 1 ? (i / (liftRates.length - 1)) * 100 : 50;
                 const y = chartHeight - (rate / maxValue) * (chartHeight - 10);
-                
+
                 let colorClass = 'thermik-medium';
                 if (rate > 2) colorClass = 'thermik-high';
                 else if (rate < 1) colorClass = 'thermik-low';
-                
+
                 return {
                     x: x,
                     y: y,
@@ -1364,7 +1387,7 @@
                     index: i
                 };
             });
-            
+
             // Erstelle Linien-Segmente zwischen Punkten
             const lineSegments = [];
             for (let i = 0; i < points.length - 1; i++) {
@@ -1375,7 +1398,7 @@
                 // Berechne Länge in Pixeln basierend auf Container-Breite
                 const lengthPx = Math.sqrt((dx * containerWidth / 100) ** 2 + dy ** 2);
                 const angle = Math.atan2(dy, dx * containerWidth / 100) * 180 / Math.PI;
-                
+
                 lineSegments.push({
                     left: p1.x + '%',
                     top: p1.y + 'px',
@@ -1383,7 +1406,7 @@
                     angle: angle
                 });
             }
-            
+
             chartDiv.innerHTML = `
                 <div class="chart-header">
                     <div class="chart-title">☀️ Thermik</div>
@@ -1406,57 +1429,58 @@
                     </div>
                 </div>
             `;
-            
+
             container.appendChild(chartDiv);
         }
 
         function createCloudChart(hours, container, chartWidth) {
             const chartDiv = document.createElement('div');
             chartDiv.className = 'chart-container';
-            
+
             const cloudBases = hours.map(h => h.data.cloud_base || 0).filter(b => b > 0);
             const minBase = cloudBases.length > 0 ? Math.min(...cloudBases) : STARTPLATZ_HOEHE - 500;
             const maxBase = cloudBases.length > 0 ? Math.max(...cloudBases) : STARTPLATZ_HOEHE + 1500;
             const range = maxBase - minBase || 1000;
-            
-            const values = hours.map(h => {
-                const base = h.data.cloud_base || 0;
-                return base > 0 ? base : STARTPLATZ_HOEHE;
-            });
-            
+
             const chartHeight = 40;
             const containerWidth = chartWidth;
             const referenceY = chartHeight - ((STARTPLATZ_HOEHE - minBase) / range) * (chartHeight - 10);
-            
+
             // Berechne Positionen für alle Punkte
-            const points = values.map((base, i) => {
-                const x = values.length > 1 ? (i / (values.length - 1)) * 100 : 50;
-                const y = chartHeight - ((base - minBase) / range) * (chartHeight - 10);
-                
-                const isDanger = base > 0 && base < STARTPLATZ_HOEHE;
+            const points = hours.map((h, i) => {
+                const base = h.data.cloud_base;
+                const hasData = base != null && base > 0;
+
+                const x = hours.length > 1 ? (i / (hours.length - 1)) * 100 : 50;
+                const y = hasData ? chartHeight - ((base - minBase) / range) * (chartHeight - 10) : null;
+
+                const isDanger = hasData && base < STARTPLATZ_HOEHE;
                 const colorClass = isDanger ? 'cloud-danger' : 'cloud-safe';
-                
+
                 return {
                     x: x,
                     y: y,
                     base: base,
+                    hasData: hasData,
                     colorClass: colorClass,
                     hour: hours[i].hour,
                     index: i
                 };
             });
-            
+
             // Erstelle Linien-Segmente zwischen Punkten
             const lineSegments = [];
             for (let i = 0; i < points.length - 1; i++) {
                 const p1 = points[i];
                 const p2 = points[i + 1];
+                if (!p1.hasData || !p2.hasData) continue;
+
                 const dx = p2.x - p1.x;
                 const dy = p2.y - p1.y;
                 // Berechne Länge in Pixeln basierend auf Container-Breite
                 const lengthPx = Math.sqrt((dx * containerWidth / 100) ** 2 + dy ** 2);
                 const angle = Math.atan2(dy, dx * containerWidth / 100) * 180 / Math.PI;
-                
+
                 lineSegments.push({
                     left: p1.x + '%',
                     top: p1.y + 'px',
@@ -1464,7 +1488,7 @@
                     angle: angle
                 });
             }
-            
+
             chartDiv.innerHTML = `
                 <div class="chart-header">
                     <div class="chart-title">☁️ Wolkenbasis</div>
@@ -1477,7 +1501,7 @@
                             <div class="html-chart-line-segment" 
                                  style="left: ${seg.left}; top: ${seg.top}; width: ${seg.width}; transform: rotate(${seg.angle}deg); background: #2563EB;"></div>
                         `).join('')}
-                        ${points.map(p => `
+                        ${points.filter(p => p.hasData).map(p => `
                             <div class="html-chart-point ${p.colorClass} chart-highlight" 
                                  style="left: ${p.x}%; top: ${p.y}px;" 
                                  data-hour-index="${p.index}"></div>
@@ -1488,7 +1512,7 @@
                     </div>
                 </div>
             `;
-            
+
             container.appendChild(chartDiv);
         }
 
@@ -1499,7 +1523,7 @@
             const rotation = direction || 0;
             const sizeValue = size === 'large' ? 50 : 24;
             const strokeWidth = size === 'large' ? 2.5 : 1.5;
-            
+
             return `
                 <div class="wind-arrow-container">
                     <div class="wind-arrow wind-arrow-${size} ${windClass}" style="transform: rotate(${rotation}deg);">
@@ -1521,19 +1545,19 @@
         function createHourCards(hours) {
             const container = document.getElementById('cards-scroll');
             container.innerHTML = '';
-            
+
             hours.forEach((hour, index) => {
                 const card = document.createElement('div');
                 card.className = 'hour-card';
                 card.dataset.hourIndex = index;
-                
+
                 const windSpeed = hour.data.wind_speed_10m || 0;
                 const windGusts = hour.data.wind_gusts_10m || 0;
                 const windDirection = hour.data.wind_direction_10m || 0;
                 const precip = hour.data.precipitation || 0;
                 const cloudBase = hour.data.cloud_base || 0;
                 const cloudCover = hour.data.cloud_cover || 0;
-                
+
                 // Berechne Thermik
                 const cape = hour.data.cape || 0;
                 let liftRate = 0;
@@ -1546,20 +1570,20 @@
                 }
                 if (hour.data.sunshine_duration > 0) liftRate *= 1.2;
                 liftRate = Math.min(5, Math.max(0, liftRate));
-                
+
                 // Bestimme Card-Klasse
                 let cardClass = '';
                 if (windSpeed > 30 || precip > 0 || (cloudBase > 0 && cloudBase < STARTPLATZ_HOEHE)) {
                     cardClass = 'danger';
                 }
-                
+
                 // Wind-Klasse für Pfeil-Farbe
                 let windClass = 'wind-good';
                 if (windSpeed > 30) windClass = 'wind-danger';
                 else if (windSpeed > 20) windClass = 'wind-warning';
-                
+
                 card.className = `hour-card ${cardClass}`;
-                
+
                 card.innerHTML = `
                     <div class="hour-time">${hour.hour}:00</div>
                     ${createWindArrow(windDirection, 'large', windClass)}
@@ -1582,12 +1606,12 @@
                         </div>
                     </div>
                 `;
-                
+
                 // Event Listeners
                 card.addEventListener('mouseenter', () => highlightHour(index));
                 card.addEventListener('mouseleave', () => clearHighlight());
                 card.addEventListener('click', () => showDetailOverlay(hour.timestamp, hour.data));
-                
+
                 container.appendChild(card);
             });
         }
@@ -1620,7 +1644,7 @@
             const overlay = document.getElementById('detail-overlay');
             const timeDiv = document.getElementById('overlay-time');
             const detailsDiv = document.getElementById('overlay-details');
-            
+
             // Parse Zeitstempel - füge Zeitzone hinzu falls fehlt
             let dt;
             if (timestamp.includes('Z') || timestamp.includes('+') || timestamp.includes('-', 10)) {
@@ -1636,7 +1660,7 @@
                 hour: '2-digit',
                 minute: '2-digit'
             });
-            
+
             detailsDiv.innerHTML = `
                 <div class="detail-item">
                     <strong>Temperatur</strong>
@@ -1679,7 +1703,7 @@
                     <span>${data.sunshine_duration ? (data.sunshine_duration / 3600).toFixed(1) : '0.0'} h</span>
                 </div>
             `;
-            
+
             overlay.classList.add('active');
         }
 
@@ -1705,4 +1729,5 @@
         loadWeatherData();
     </script>
 </body>
+
 </html>

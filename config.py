@@ -11,6 +11,7 @@ LOCATION = {
     "name": "Uetliberg - Startplatz Balderen",
     "latitude": 47.3226,
     "longitude": 8.5008,
+    "elevation_ref": 730,  # Starthöhe Balderen in m MSL (für Thermik-Berechnung)
     "typ": "Startplatz",
     "fluggebiet": "Uetliberg",
     "windrichtung": "N-O",
@@ -98,8 +99,14 @@ HOURLY_PARAMS = [
     "cloud_cover_mid",
     "cloud_cover_high",
     "sunshine_duration",
-    "cape"
+    "cape",
+    "boundary_layer_height",
+    "surface_pressure",
+    "shortwave_radiation",
+    "surface_sensible_heat_flux",
+    "surface_latent_heat_flux",
 ]
+
 
 # ============================================================================
 # HÖHENWIND-PARAMETER (Pressure Level Daten)
@@ -116,10 +123,12 @@ PRESSURE_LEVEL_PARAMS = []
 for _level in PRESSURE_LEVELS:
     PRESSURE_LEVEL_PARAMS.extend([
         f"temperature_{_level}hPa",
+        f"relative_humidity_{_level}hPa",
         f"wind_speed_{_level}hPa",
         f"wind_direction_{_level}hPa",
         f"geopotential_height_{_level}hPa"
     ])
+
 
 # ============================================================================
 # LLM PROMPT-KONFIGURATION (für location_evaluator.py)
@@ -164,10 +173,17 @@ WICHTIG HÖHENWIND-ANALYSE:
 - OPTIMAL: Gleichmäßiges Windprofil (Geschwindigkeit steigt sanft, Richtung konstant)
 - HÖHENWINDE: Starke Winde in der Höhe können auf Lee-Rotor oder Föhn hinweisen
 
+WICHTIG THERMIK-MODELL (THERMIK-PROXY):
+- In den Daten ist ein physikalisches Thermik-Proxy-Modell enthalten. Beziehe dich bei der Thermik-Bewertung primär auf diese Werte!
+- "m/s" = Erwartetes Steigen (w* Variante). <1.0 = schwach, 1-2 = gut abends/mittags, >2.5 = stark (sportlich)
+- "bis X m MSL" = Das ist die exakt berechnete nutzbare Arbeitshöhe der Thermik (Inversion oder Limit), bewerte das für Streckenflugpotenzial.
+- "LCL/Basis = X m" = Das ist das errechnete Kondensationsniveau. Wenn Arbeitshöhe > Basis, dann stoßen Piloten an die Wolke.
+- Das Güte-Rating (0-10) gibt einen klaren Anhaltspunkt für die Stärke der Thermik in diesem Zeitfenster.
+
 Bewerte nach folgenden Kriterien:
 1. Wind (RANGE in Grad, Konsistenz, Volatilität, Böen-Gefahr, 2h-Fenster)
-2. Thermik-Potenzial (CAPE, Sonnenschein, Bewölkungstyp, Temperatur)
-3. Wolkenbasis (MSL-Höhe, kritische Schwellen für Uetliberg)
+2. Thermik-Potenzial (NUTZE DIE THERMIK-PROXY WERTE, CAPE, Sonnenschein)
+3. Wolkenbasis (MSL-Höhe, LCL, kritische Schwellen für Uetliberg)
 4. Niederschlag und Sicht
 5. Luftraum-Einschränkungen
 6. Wetterentwicklung (nächste 3-6h)
@@ -281,3 +297,48 @@ WICHTIG FÜR DIE ANALYSE:
 
 Antworte mit dem geforderten JSON-Format."""
 
+# ============================================================================
+# REGIONEN-KONFIGURATION (29 Thermikregionen)
+# IDs, lat/lon und elevation_ref stammen aus regionen_referenzpunkte.geojson
+# (= echte Gleitschirm-Startplätze als Referenzpunkte pro Region)
+# Jede Region hat genau ein Polygon in regionen_xc_thermik.geojson
+# ============================================================================
+
+REGIONS = [
+    # --- Jura ---
+    {"id": "jura_west", "name": "Jura West", "lat": 46.8286, "lon": 6.5401, "elevation_ref": 1200},
+    {"id": "jura_zentral", "name": "Jura Zentral", "lat": 47.2536, "lon": 7.5097, "elevation_ref": 1280},
+    {"id": "jura_ost", "name": "Jura Ost", "lat": 47.42, "lon": 7.957, "elevation_ref": 900},
+    # --- Mittelland ---
+    {"id": "mittelland_west", "name": "Mittelland West", "lat": 46.6685, "lon": 6.7972, "elevation_ref": 700},
+    {"id": "seeland_emmental", "name": "Seeland / Emmental", "lat": 47.14, "lon": 7.60, "elevation_ref": 600},
+    {"id": "mittelland_zentral", "name": "Mittelland Zentral", "lat": 47.0041, "lon": 7.9395, "elevation_ref": 1400},
+    {"id": "mittelland_ost", "name": "Mittelland Ost", "lat": 47.3504, "lon": 8.4907, "elevation_ref": 730},
+    # --- Voralpen ---
+    {"id": "genferseeregion", "name": "Genferseeregion", "lat": 46.38, "lon": 6.38, "elevation_ref": 800},
+    {"id": "freiburger_voralpen", "name": "Freiburger Voralpen", "lat": 46.5492, "lon": 7.0175, "elevation_ref": 1950},
+    {"id": "schwarzsee_gantrisch", "name": "Schwarzsee / Gantrisch", "lat": 46.65, "lon": 7.10, "elevation_ref": 1500},
+    {"id": "berner_oberland", "name": "Berner Oberland", "lat": 46.85, "lon": 7.75, "elevation_ref": 1800},
+    {"id": "berner_voralpen", "name": "Berner Voralpen", "lat": 46.7082, "lon": 7.7731, "elevation_ref": 1950},
+    {"id": "zentralschweizer_voralpen", "name": "Zentralschweizer Voralpen", "lat": 46.837, "lon": 8.406, "elevation_ref": 1860},
+    {"id": "glarnerland_walensee", "name": "Glarnerland / Walensee", "lat": 47.135, "lon": 9.294, "elevation_ref": 1300},
+    {"id": "alpstein", "name": "Alpstein / Ostschweiz", "lat": 47.2839, "lon": 9.4081, "elevation_ref": 1640},
+    # --- Wallis ---
+    {"id": "unterwallis", "name": "Unterwallis", "lat": 46.0844, "lon": 7.2458, "elevation_ref": 2200},
+    {"id": "mattertal_saastal", "name": "Mattertal / Saastal", "lat": 46.06, "lon": 7.65, "elevation_ref": 2000},
+    {"id": "waadtlaender_alpen", "name": "Waadtländer Alpen", "lat": 46.26, "lon": 7.00, "elevation_ref": 1600},
+    {"id": "zentralwallis", "name": "Zentralwallis", "lat": 46.47, "lon": 7.85, "elevation_ref": 2100},
+    {"id": "oberwallis_goms", "name": "Oberwallis / Goms", "lat": 46.4086, "lon": 8.1102, "elevation_ref": 2200},
+    # --- Alpen Zentral ---
+    {"id": "haslital_grimsel", "name": "Haslital / Grimselgebiet", "lat": 46.745, "lon": 8.243, "elevation_ref": 2200},
+    {"id": "urner_alpen", "name": "Urner Alpen", "lat": 46.901, "lon": 8.647, "elevation_ref": 1500},
+    {"id": "surselva", "name": "Surselva", "lat": 46.8353, "lon": 9.2131, "elevation_ref": 2200},
+    # --- Ostschweiz / Graubuenden ---
+    {"id": "chur_mittelbuenden", "name": "Chur / Mittelbünden", "lat": 46.993, "lon": 9.68, "elevation_ref": 1700},
+    {"id": "engadin_ober", "name": "Engadin Ober", "lat": 46.5225, "lon": 9.9028, "elevation_ref": 2450},
+    {"id": "engadin_unter", "name": "Engadin Unter", "lat": 46.8125, "lon": 10.2786, "elevation_ref": 2100},
+    # --- Tessin / Suedbuenden ---
+    {"id": "tessin_nord", "name": "Tessin Nord", "lat": 46.4861, "lon": 8.815, "elevation_ref": 2000},
+    {"id": "tessin_zentral", "name": "Tessin Zentral", "lat": 46.2025, "lon": 8.7944, "elevation_ref": 1650},
+    {"id": "suedbuenden", "name": "Südbünden", "lat": 46.2644, "lon": 9.145, "elevation_ref": 1500},
+]

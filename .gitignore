@@ -14,9 +14,16 @@ env/
 .env.local
 .env.*.local
 
-# Daten
+# Daten (generierte Outputs)
 data/wetterdaten.json
 data/evaluations.json
+data/regions_forecast.json
+
+# Cache
+.cache.sqlite
+
+# Windows Artifacts
+NUL
 
 # IDE
 .vscode/

@@ -361,34 +361,7 @@
             background-color: rgba(239, 68, 68, 0.06);
         }
 
-        /* ========== METEOGRAM ========== */
-        .meteogram-container {
-            background: var(--color-card);
-            backdrop-filter: blur(12px);
-            border: 1px solid var(--glass-border);
-            border-radius: 20px;
-            padding: 24px;
-            margin-bottom: 24px;
-            box-shadow: var(--shadow-lg);
-            position: relative;
-            overflow: hidden;
-        }
 
-        .chart-title {
-            font-size: 16px;
-            font-weight: 700;
-            margin-bottom: 16px;
-            color: var(--color-text-light);
-        }
-
-        .unified-chart {
-            width: 100%;
-            height: 500px;
-        }
-
-        #altitude-wind-chart.unified-chart {
-            height: 750px;
-        }
 
         /* ========== EVALUATION DETAILS ========== */
         .evaluation-section {
@@ -530,6 +503,68 @@
             }
         }
 
+        /* Loading Progress Bar */
+        .loading-progress {
+            width: 100%;
+            margin-top: 16px;
+        }
+
+        .loading-progress .progress-track {
+            width: 100%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 10px;
+        }
+
+        .loading-progress .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #10B981, #34D399, #6EE7B7);
+            border-radius: 4px;
+            transition: width 0.5s ease;
+            width: 0%;
+            position: relative;
+        }
+
+        .loading-progress .progress-fill::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+            animation: shimmer 1.5s infinite;
+        }
+
+        @keyframes shimmer {
+            0% {
+                transform: translateX(-100%);
+            }
+
+            100% {
+                transform: translateX(100%);
+            }
+        }
+
+        .loading-progress .progress-steps {
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.4);
+            letter-spacing: 0.3px;
+        }
+
+        .loading-progress .progress-steps .active {
+            color: #34D399;
+            font-weight: 700;
+        }
+
+        .loading-progress .progress-steps .done {
+            color: rgba(255, 255, 255, 0.6);
+        }
+
         @media (max-width: 768px) {
             .hero-status {
                 font-size: 28px;
@@ -559,12 +594,13 @@
     <div class="container">
         <!-- HERO BANNER -->
         <div class="hero-banner no-data" id="hero-banner">
-            <div class="hero-status" id="hero-status">Lade...</div>
+            <div class="hero-status" id="hero-status">Keine Daten vorhanden</div>
             <div class="hero-meta" id="hero-meta" style="display:none;">
                 <div class="hero-rating" id="hero-rating"></div>
                 <span class="hero-conditions" id="hero-conditions"></span>
             </div>
-            <div class="hero-summary" id="hero-summary"></div>
+            <div class="hero-summary" id="hero-summary">Klicke oben auf "Daten aktualisieren" um Wetterdaten abzurufen
+            </div>
             <div class="hero-confidence" id="hero-confidence" style="display:none;">
                 <span>KI-Konfidenz</span>
                 <div class="hero-confidence-bar">
@@ -576,9 +612,14 @@
 
         <!-- NAV BAR -->
         <div class="nav-bar">
-            <span class="location-info" id="location-info">Lade...</span>
+            <span class="location-info" id="location-info"></span>
             <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
                 <select id="day-select" style="display:none;"></select>
+                <a href="/meteo"
+                    style="padding:10px 20px;background:rgba(16,185,129,0.2);color:#34D399;border:1px solid rgba(16,185,129,0.3);border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;text-decoration:none;text-transform:uppercase;letter-spacing:0.5px;transition:all 0.3s ease;"
+                    onmouseover="this.style.background='rgba(16,185,129,0.35)';this.style.transform='translateY(-2px)'"
+                    onmouseout="this.style.background='rgba(16,185,129,0.2)';this.style.transform='none'">📊
+                    Meteogramm</a>
                 <a href="/config"
                     style="padding:10px 20px;background:rgba(99,102,241,0.2);color:#818CF8;border:1px solid rgba(99,102,241,0.3);border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;text-decoration:none;text-transform:uppercase;letter-spacing:0.5px;transition:all 0.3s ease;"
                     onmouseover="this.style.background='rgba(99,102,241,0.35)';this.style.transform='translateY(-2px)'"
@@ -618,21 +659,7 @@
             <div class="hourly-grid" id="hourly-grid"></div>
         </div>
 
-        <!-- METEOGRAM -->
-        <div class="meteogram-container">
-            <div class="chart-title">Detail-Meteogramm</div>
-            <div id="unified-meteogram" class="unified-chart"></div>
-            <div id="loading-overlay" class="loading">
-                <div class="spinner"></div>
-                <p style="font-size:13px; color:var(--color-text-light);">Analysiere Wetterdaten...</p>
-            </div>
-        </div>
 
-        <!-- ALTITUDE WIND PROFILE -->
-        <div class="meteogram-container" id="altitude-wind-container" style="display:none;">
-            <div class="chart-title">Höhenwind-Profil (Wind vs. Höhe)</div>
-            <div id="altitude-wind-chart" class="unified-chart"></div>
-        </div>
 
 
     </div>
@@ -642,11 +669,9 @@
     <script>
         let weatherData = null;
         let evaluationData = null;
-        let altitudeWindData = null;
         let currentDate = null;
         let availableDates = [];
         let allowedWindRange = null;
-        const margin = { top: 30, right: 50, bottom: 35, left: 55 };
         const tooltip = d3.select('#tooltip');
 
         function formatTime(date) { return d3.timeFormat('%H:%M')(date); }
@@ -697,14 +722,20 @@
         // ========== DATA LOADING ==========
         async function loadData() {
             try {
-                const [weatherResp, evalResp, altWindResp] = await Promise.all([
-                    fetch('/api/weather'), fetch('/api/evaluation'), fetch('/api/altitude-wind')
+                const [weatherResp, evalResp] = await Promise.all([
+                    fetch('/api/weather'), fetch('/api/evaluation')
                 ]);
                 const weatherResult = await weatherResp.json();
                 const evalResult = await evalResp.json();
-                const altWindResult = await altWindResp.json();
 
                 if (weatherResult.success) {
+                    // Check if data is empty (no weather data fetched yet)
+                    if (!weatherResult.dates || weatherResult.dates.length === 0) {
+                        document.getElementById('hero-status').textContent = 'Keine Daten vorhanden';
+                        document.getElementById('hero-summary').textContent = 'Klicke oben auf "Daten aktualisieren" um Wetterdaten abzurufen';
+                        document.getElementById('location-info').textContent = '';
+                        return;
+                    }
                     weatherData = weatherResult;
                     availableDates = weatherResult.dates || [];
                     allowedWindRange = parseAllowedWindDirection(weatherResult.location?.windrichtung);
@@ -719,28 +750,16 @@
                     evaluationData = evalResult.evaluations || {};
                 }
 
-                if (altWindResult.success && altWindResult.days && Object.keys(altWindResult.days).length > 0) {
-                    altitudeWindData = altWindResult;
-                    document.getElementById('altitude-wind-container').style.display = 'block';
-                }
-
                 if (currentDate) {
                     updateAll(currentDate);
                 }
-
-                document.getElementById('loading-overlay').style.display = 'none';
             } catch (error) {
                 document.getElementById('hero-status').textContent = 'Fehler beim Laden';
-                document.getElementById('loading-overlay').style.display = 'none';
             }
         }
 
         function updateAll(date) {
-            updateChartsForDate(date);
             buildHourlyGrid(date);
-            if (altitudeWindData?.days?.[date]) {
-                drawAltitudeWindProfile(altitudeWindData.days[date], date);
-            }
             if (evaluationData?.[date]) {
                 displayHeroBanner(evaluationData[date]);
                 displayEvaluation(evaluationData[date]);
@@ -775,13 +794,14 @@
                 `${data.location.name} \u2022 Startrichtung: ${data.location.windrichtung} \u2022 ${h.start}\u2013${h.end} Uhr`;
         }
 
-        function updateChartsForDate(date) {
-            if (!weatherData?.days?.[date]) return;
-            drawUnifiedMeteogram(weatherData.days[date]);
-        }
+
 
         // ========== HERO BANNER ==========
         function displayHeroBanner(ev) {
+            if (!ev) {
+                resetHeroBanner();
+                return;
+            }
             const banner = document.getElementById('hero-banner');
             const status = document.getElementById('hero-status');
             const meta = document.getElementById('hero-meta');
@@ -793,16 +813,17 @@
             banner.className = 'hero-banner ' + (ev.flyable ? 'flyable' : 'not-flyable');
             status.textContent = ev.flyable ? 'FLIEGBAR' : 'NICHT FLIEGBAR';
             meta.style.display = 'flex';
-            rating.innerHTML = ev.rating + '<small>/10</small>';
+            rating.innerHTML = (ev.rating || 0) + '<small>/10</small>';
             const c = conditionColors[ev.conditions] || '#94A3B8';
-            cond.textContent = ev.conditions;
+            cond.textContent = ev.conditions || '-';
             cond.style.background = `rgba(${hexToRgb(c)}, 0.2)`;
             cond.style.color = c;
             cond.style.border = `1px solid rgba(${hexToRgb(c)}, 0.4)`;
             summary.textContent = ev.summary || '';
             conf.style.display = 'flex';
-            document.getElementById('hero-confidence-fill').style.width = (ev.confidence * 10) + '%';
-            document.getElementById('hero-confidence-val').textContent = ev.confidence + '/10';
+            const confidenceVal = ev.confidence || 0;
+            document.getElementById('hero-confidence-fill').style.width = (confidenceVal * 10) + '%';
+            document.getElementById('hero-confidence-val').textContent = confidenceVal + '/10';
         }
 
         function resetHeroBanner() {
@@ -1007,528 +1028,82 @@
             });
         }
 
-        // ========== D3 METEOGRAM ==========
-        function drawUnifiedMeteogram(dayData) {
-            const container = d3.select('#unified-meteogram');
-            container.selectAll('*').remove();
-
-            const rect = container.node().getBoundingClientRect();
-            const width = rect.width - margin.left - margin.right;
-            const height = rect.height - margin.top - margin.bottom;
-
-            const svg = container.append('svg')
-                .attr('width', width + margin.left + margin.right)
-                .attr('height', height + margin.top + margin.bottom);
-
-            const defs = svg.append('defs');
-
-            const windGrad = defs.append('linearGradient').attr('id', 'wind-grad').attr('x1', '0').attr('y1', '0').attr('x2', '0').attr('y2', '1');
-            windGrad.append('stop').attr('offset', '0%').attr('stop-color', '#6366F1').attr('stop-opacity', '0.4');
-            windGrad.append('stop').attr('offset', '100%').attr('stop-color', '#6366F1').attr('stop-opacity', '0');
-
-            const thermGrad = defs.append('linearGradient').attr('id', 'thermik-grad').attr('x1', '0').attr('y1', '0').attr('x2', '0').attr('y2', '1');
-            thermGrad.append('stop').attr('offset', '0%').attr('stop-color', '#A855F7').attr('stop-opacity', '0.4');
-            thermGrad.append('stop').attr('offset', '100%').attr('stop-color', '#A855F7').attr('stop-opacity', '0');
-
-            const cloudGrad = defs.append('linearGradient').attr('id', 'cloud-grad').attr('x1', '0').attr('y1', '0').attr('x2', '0').attr('y2', '1');
-            cloudGrad.append('stop').attr('offset', '0%').attr('stop-color', '#475569').attr('stop-opacity', '0.7');
-            cloudGrad.append('stop').attr('offset', '100%').attr('stop-color', '#94A3B8').attr('stop-opacity', '0.1');
-
-            const arrowMarker = defs.append('marker').attr('id', 'wind-arrow-head').attr('viewBox', '0 0 10 10').attr('refX', 5).attr('refY', 5).attr('markerWidth', 4).attr('markerHeight', 4).attr('orient', 'auto');
-            arrowMarker.append('path').attr('d', 'M 0 0 L 10 5 L 0 10 z').attr('fill', '#F8FAFC');
-
-            const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
-
-            const times = dayData.wind.map(d => new Date(d.time));
-            const xScale = d3.scaleTime().domain(d3.extent(times)).range([0, width]);
-
-            const lanes = {
-                wind: { y: 15, h: height * 0.45 },
-                thermik: { y: height * 0.50, h: height * 0.20 },
-                cloud: { y: height * 0.75, h: height * 0.20 }
-            };
-
-            // Flyability background stripes
-            const precips = dayData.precipitation || [];
-            dayData.wind.forEach((w, i) => {
-                const p = precips[i] ? precips[i].amount : 0;
-                const fly = getHourFlyability({ speed: w.speed, gusts: w.gusts, direction: w.direction, _precip: p });
-                const colors = { green: 'rgba(16,185,129,0.04)', yellow: 'rgba(245,158,11,0.06)', red: 'rgba(239,68,68,0.06)' };
-                const x0 = i === 0 ? 0 : (xScale(times[i]) + xScale(times[i - 1])) / 2;
-                const x1 = i === times.length - 1 ? width : (xScale(times[i]) + xScale(times[i + 1])) / 2;
-                g.append('rect')
-                    .attr('x', x0).attr('y', 0).attr('width', x1 - x0).attr('height', height)
-                    .attr('fill', colors[fly]);
-            });
-
-            // WIND LANE
-            const maxWind = d3.max(dayData.wind, d => Math.max(d.speed, d.gusts));
-            const yWind = d3.scaleLinear().domain([0, Math.max(25, maxWind)]).range([lanes.wind.y + lanes.wind.h, lanes.wind.y]);
-
-            g.append('g').attr('class', 'grid').call(d3.axisLeft(yWind).ticks(4).tickSize(-width).tickFormat(''));
-
-            const gustArea = d3.area().x((d, i) => xScale(times[i])).y0(yWind(0)).y1(d => yWind(d.gusts)).curve(d3.curveMonotoneX);
-            g.append('path').datum(dayData.wind).attr('fill', 'url(#wind-grad)').attr('d', gustArea);
-
-            const windLine = d3.line().x((d, i) => xScale(times[i])).y(d => yWind(d.speed)).curve(d3.curveMonotoneX);
-            g.append('path').datum(dayData.wind).attr('fill', 'none').attr('stroke', '#818CF8').attr('stroke-width', 3).attr('d', windLine);
-
-            // Wind arrows
-            const arrowG = g.append('g');
-            dayData.wind.forEach((d, i) => {
-                const rot = (d.direction + 180) % 360;
-                const x = xScale(times[i]);
-                const y = yWind(d.speed) - 10;
-                arrowG.append('line').attr('x1', x).attr('y1', y + 5).attr('x2', x).attr('y2', y - 5)
-                    .attr('stroke', '#F8FAFC').attr('stroke-width', 2).attr('marker-end', 'url(#wind-arrow-head)')
-                    .attr('transform', `rotate(${rot},${x},${y})`);
-                if (i % 2 === 0) {
-                    arrowG.append('text').attr('x', x).attr('y', yWind(d.speed) - 25).attr('text-anchor', 'middle')
-                        .attr('fill', '#818CF8').style('font-size', '10px').style('font-weight', '700').text(d.speed.toFixed(0));
-                }
-            });
-
-            // THERMIK LANE
-            const maxCape = d3.max(dayData.thermik, d => d.cape) || 0;
-            const yThermik = d3.scaleLinear().domain([0, Math.max(1000, maxCape)]).range([lanes.thermik.y + lanes.thermik.h, lanes.thermik.y]);
-
-            const thermArea = d3.area().x((d, i) => xScale(times[i])).y0(yThermik(0)).y1(d => yThermik(d.cape)).curve(d3.curveMonotoneX);
-            g.append('path').datum(dayData.thermik).attr('fill', 'url(#thermik-grad)').attr('d', thermArea);
-
-            const yPrecip = d3.scaleLinear().domain([0, 5]).range([lanes.thermik.y + lanes.thermik.h, lanes.thermik.y]);
-            g.selectAll('.rain-bar').data(dayData.precipitation).enter().append('rect')
-                .attr('x', (d, i) => xScale(times[i]) - 3).attr('y', d => yPrecip(d.amount))
-                .attr('width', 6).attr('height', d => (lanes.thermik.y + lanes.thermik.h) - yPrecip(d.amount))
-                .attr('fill', '#38BDF8').attr('rx', 2);
-
-            // CLOUD LANE
-            const hasCloudBase = dayData.cloudbase?.some(d => d.height != null);
-            const hasCloudCover = dayData.cloudbase?.some(d => d.cover != null);
-
-            if (hasCloudCover) {
-                const yCC = d3.scaleLinear().domain([0, 100]).range([lanes.cloud.y + lanes.cloud.h, lanes.cloud.y]);
-                const coverArea = d3.area().x((d, i) => xScale(times[i])).y0(lanes.cloud.y + lanes.cloud.h).y1(d => yCC(d.cover || 0)).curve(d3.curveMonotoneX);
-                g.append('path').datum(dayData.cloudbase).attr('fill', 'url(#cloud-grad)').attr('d', coverArea);
-            }
-
-            if (hasCloudBase) {
-                let minC = d3.min(dayData.cloudbase, d => d.height) || 0;
-                let maxC = d3.max(dayData.cloudbase, d => d.height) || 3000;
-                const yCB = d3.scaleLinear().domain([Math.max(0, minC - 500), maxC + 500]).range([lanes.cloud.y + lanes.cloud.h, lanes.cloud.y]);
-                const cloudLine = d3.line().defined(d => d.height != null).x((d, i) => xScale(times[i])).y(d => yCB(d.height)).curve(d3.curveMonotoneX);
-                g.append('path').datum(dayData.cloudbase).attr('fill', 'none').attr('stroke', '#BAE6FD').attr('stroke-width', 2).attr('stroke-dasharray', '4,4').attr('d', cloudLine);
-
-                dayData.cloudbase.forEach((d, i) => {
-                    if (d.height != null && i % 3 === 0) {
-                        g.append('text').attr('x', xScale(new Date(d.time))).attr('y', yCB(d.height) - 8)
-                            .attr('text-anchor', 'middle').attr('fill', '#BAE6FD').style('font-size', '9px').style('font-weight', '700')
-                            .text(d.height.toFixed(0) + 'm');
-                    }
-                });
-            }
-
-            if (!hasCloudBase && !hasCloudCover) {
-                g.append('text').attr('x', width / 2).attr('y', lanes.cloud.y + lanes.cloud.h / 2).attr('text-anchor', 'middle')
-                    .attr('fill', 'var(--color-text-light)').style('font-size', '12px').style('font-style', 'italic').text('Keine Wolkendaten');
-            }
-
-            // Axes & labels
-            g.append('g').attr('class', 'axis').attr('transform', `translate(0,${height})`).call(d3.axisBottom(xScale).ticks(d3.timeHour.every(1)).tickFormat(formatTime));
-            g.append('text').attr('class', 'lane-label').attr('x', -margin.left + 8).attr('y', lanes.wind.y + 12).text('WIND');
-            g.append('text').attr('class', 'lane-label').attr('x', -margin.left + 8).attr('y', lanes.thermik.y + 12).text('THERMIK');
-            g.append('text').attr('class', 'lane-label').attr('x', -margin.left + 8).attr('y', lanes.cloud.y + 12).text('WOLKEN');
-
-            // Legend
-            const leg = svg.append('g').attr('transform', `translate(${margin.left},${height + margin.top + 20})`);
-            [{ c: '#818CF8', l: 'Wind' }, { c: '#6366F1', l: 'Böen' }, { c: '#A855F7', l: 'CAPE' }, { c: '#38BDF8', l: 'Regen' }, { c: '#BAE6FD', l: 'Basis' }, { c: '#94A3B8', l: 'Bewölkung' }].forEach((item, i) => {
-                const lg = leg.append('g').attr('transform', `translate(${i * 90},0)`);
-                lg.append('rect').attr('width', 10).attr('height', 10).attr('rx', 2).attr('fill', item.c);
-                lg.append('text').attr('x', 14).attr('y', 9).attr('fill', 'var(--color-text-light)').style('font-size', '10px').style('font-weight', '600').text(item.l);
-            });
-
-            // Hover
-            const hoverLine = g.append('line').attr('stroke', '#F8FAFC').attr('stroke-width', 1).attr('stroke-dasharray', '4,4').attr('y1', 0).attr('y2', height).style('opacity', 0);
-            g.append('rect').attr('width', width).attr('height', height).attr('fill', 'none').attr('pointer-events', 'all')
-                .on('mousemove', function (event) {
-                    const [mx] = d3.pointer(event);
-                    const date = xScale.invert(mx);
-                    const idx = d3.bisector(d => d).left(times, date);
-                    const d = dayData.wind[idx] || dayData.wind[idx - 1];
-                    const t = dayData.thermik[idx] || dayData.thermik[idx - 1];
-                    const c = dayData.cloudbase?.[idx] || dayData.cloudbase?.[idx - 1];
-                    const p = dayData.precipitation[idx] || dayData.precipitation[idx - 1];
-                    if (!d) return;
-                    hoverLine.attr('x1', xScale(times[idx])).attr('x2', xScale(times[idx])).style('opacity', 1);
-                    let cloudHtml = '';
-                    if (c) {
-                        if (c.cover != null) cloudHtml += `<div class="tooltip-row"><span class="tooltip-label">Bewölkung</span><span class="tooltip-value">${c.cover.toFixed(0)}%</span></div>`;
-                        if (c.height != null) cloudHtml += `<div class="tooltip-row"><span class="tooltip-label">Basis</span><span class="tooltip-value">${c.height.toFixed(0)} m</span></div>`;
-                    }
-                    tooltip.style('opacity', 1).style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - 15) + 'px')
-                        .html(`<div style="font-weight:800;border-bottom:1px solid rgba(255,255,255,0.1);margin-bottom:6px;padding-bottom:3px;">${formatTime(times[idx])}</div>
-                            <div class="tooltip-row"><span class="tooltip-label">Wind</span><span class="tooltip-value">${d.speed.toFixed(1)} km/h</span></div>
-                            <div class="tooltip-row"><span class="tooltip-label">Böen</span><span class="tooltip-value">${d.gusts.toFixed(1)} km/h</span></div>
-                            <div class="tooltip-row"><span class="tooltip-label">Richtung</span><span class="tooltip-value">${d.direction}\u00b0 (${getWindDirectionName(d.direction)})</span></div>
-                            <div class="tooltip-row" style="margin-top:3px;"><span class="tooltip-label">CAPE</span><span class="tooltip-value">${t ? t.cape.toFixed(0) : 0} J/kg</span></div>
-                            <div class="tooltip-row"><span class="tooltip-label">Regen</span><span class="tooltip-value">${p ? p.amount.toFixed(1) : 0} mm</span></div>
-                            ${cloudHtml}`);
-                }).on('mouseleave', () => { hoverLine.style('opacity', 0); tooltip.style('opacity', 0); });
-        }
-
-        // ========== ALTITUDE WIND PROFILE CHART ==========
-        function drawAltitudeWindProfile(dayData, date) {
-            const container = d3.select('#altitude-wind-chart');
-            container.selectAll('*').remove();
-
-            if (!dayData || !dayData.profiles || dayData.profiles.length === 0) {
-                container.append('div')
-                    .style('text-align', 'center').style('padding', '40px')
-                    .style('color', 'var(--color-text-light)')
-                    .text('Keine Höhenwind-Daten für diesen Tag verfügbar');
-                return;
-            }
-
-            const rect = container.node().getBoundingClientRect();
-            const width = rect.width - margin.left - margin.right;
-            const height = rect.height - margin.top - margin.bottom;
-
-            const svg = container.append('svg')
-                .attr('width', width + margin.left + margin.right)
-                .attr('height', height + margin.top + margin.bottom);
-
-            const g = svg.append('g')
-                .attr('transform', `translate(${margin.left},${margin.top})`);
-
-            // X-Achse: Zeit (wie bei anderen Diagrammen)
-            const times = dayData.profiles.map(p => new Date(p.time));
-            const xScale = d3.scaleTime()
-                .domain(d3.extent(times))
-                .range([0, width]);
-
-            // Y-Achse: Höhe (maximal bis 2500m für granularere Darstellung)
-            const allAltitudes = dayData.profiles.flatMap(p => p.levels.map(l => l.altitude));
-            const maxAltitude = Math.min(2500, d3.max(allAltitudes) || 2500);
-            const minAltitude = Math.max(0, d3.min(allAltitudes) || 0);
-            const yScale = d3.scaleLinear()
-                .domain([minAltitude, maxAltitude])
-                .range([height, 0]);
-
-            // Windgeschwindigkeit-Skalierung für Pfeillänge (max 40 km/h)
-            const allWindSpeeds = dayData.profiles.flatMap(p => p.levels.map(l => l.wind_speed));
-            const maxWindSpeed = 40;
-            const maxArrowLength = 25; // Maximale Pfeillänge in Pixeln
-            const baseArrowSize = 12; // Basis-Pfeilgröße
-
-            // Farbkodierung nach Windgeschwindigkeit - warme Farben (Gelb-Orange-Rot) für besseren Kontrast auf dunkelblauem Hintergrund
-            const windColorScale = d3.scaleSequential()
-                .domain([0, maxWindSpeed])
-                .interpolator(d3.interpolateYlOrRd); // Gelb-Orange-Rot statt Blau-Violett
-
-            // Hilfsfunktion für kontrastreiche warme Farben
-            function getContrastColor(windSpeed) {
-                const baseColor = windColorScale(windSpeed);
-                // Für warme Farben: weniger brighten, da sie bereits gut sichtbar sind
-                return d3.rgb(baseColor).brighter(0.5);
-            }
-
-            // Clipping-Path für Trend-Linien (damit sie nicht über Diagramm-Grenzen hinausgehen)
-            const defs = svg.append('defs');
-            const clipPath = defs.append('clipPath')
-                .attr('id', 'clip-altitude-wind');
-            clipPath.append('rect')
-                .attr('x', 0)
-                .attr('y', 0)
-                .attr('width', width)
-                .attr('height', height);
-
-            // Grid
-            // Y-Achse: Ticks alle 200 m
-            const yTickStep = 200;
-            const yTicks = [];
-            for (let h = Math.ceil(minAltitude / yTickStep) * yTickStep; h <= maxAltitude; h += yTickStep) {
-                yTicks.push(h);
-            }
-            g.append('g').attr('class', 'grid')
-                .call(d3.axisLeft(yScale).tickValues(yTicks).tickSize(-width).tickFormat(''));
-            g.append('g').attr('class', 'grid').attr('transform', `translate(0,${height})`)
-                .call(d3.axisBottom(xScale).ticks(d3.timeHour.every(1)).tickSize(-height).tickFormat(''));
-
-            // Draw trend lines for each profile (showing wind speed development over altitude)
-            dayData.profiles.forEach((profile, idx) => {
-                const profileTime = new Date(profile.time);
-                const cx = xScale(profileTime);
-
-                // Create line generator for this profile (vertical line connecting altitude levels)
-                if (profile.levels.length >= 2) {
-                    const lineData = profile.levels.map(level => ({
-                        x: cx,
-                        y: yScale(level.altitude),
-                        windSpeed: level.wind_speed
-                    }));
-
-                    // Color based on average wind speed for this profile - kontrastreicher
-                    const avgWindSpeed = d3.mean(profile.levels.map(l => l.wind_speed)) || 0;
-                    const lineColor = getContrastColor(avgWindSpeed);
-
-                    // Draw vertical line connecting all altitude levels for this time
-                    const lineGen = d3.line()
-                        .x(d => d.x)
-                        .y(d => d.y)
-                        .curve(d3.curveMonotoneY);
-
-                    g.append('path')
-                        .datum(lineData)
-                        .attr('fill', 'none')
-                        .attr('stroke', lineColor)
-                        .attr('stroke-width', 2)
-                        .attr('opacity', 0.4)
-                        .attr('clip-path', 'url(#clip-altitude-wind)')
-                        .attr('d', lineGen)
-                        .on('mouseover', function (event) {
-                            d3.select(this).attr('stroke-width', 3).attr('opacity', 0.7);
-                            const time = new Date(profile.time);
-                            tooltip.style('opacity', 1)
-                                .style('left', (event.pageX + 15) + 'px')
-                                .style('top', (event.pageY - 15) + 'px')
-                                .html(`<div style="font-weight:800;border-bottom:1px solid rgba(255,255,255,0.1);margin-bottom:6px;padding-bottom:3px;">${formatTime(time)} Uhr</div>
-                                    <div class="tooltip-row"><span class="tooltip-label">Höhenprofil</span></div>
-                                    <div class="tooltip-row"><span class="tooltip-label">Ø Windgeschwindigkeit</span><span class="tooltip-value">${avgWindSpeed.toFixed(1)} km/h</span></div>
-                                    <div class="tooltip-row"><span class="tooltip-label">Höhenstufen</span><span class="tooltip-value">${profile.levels.length}</span></div>`);
-                        })
-                        .on('mouseout', function () {
-                            d3.select(this).attr('stroke-width', 2).attr('opacity', 0.4);
-                            tooltip.style('opacity', 0);
-                        });
-                }
-
-                // Interpoliere Winddaten für alle 200m-Schritte
-                function interpolateWind(altitude, levels) {
-                    // Sortiere Levels nach Höhe
-                    const sortedLevels = [...levels].sort((a, b) => a.altitude - b.altitude);
-
-                    // Wenn genau auf einer Höhe, direkt zurückgeben
-                    const exact = sortedLevels.find(l => Math.abs(l.altitude - altitude) < 1);
-                    if (exact) return exact;
-
-                    // Finde die beiden benachbarten Levels
-                    let lower = null, upper = null;
-                    for (let i = 0; i < sortedLevels.length - 1; i++) {
-                        if (sortedLevels[i].altitude <= altitude && sortedLevels[i + 1].altitude >= altitude) {
-                            lower = sortedLevels[i];
-                            upper = sortedLevels[i + 1];
-                            break;
-                        }
-                    }
-
-                    // Wenn unter dem Minimum, verwende niedrigstes Level
-                    if (!lower && sortedLevels.length > 0 && altitude < sortedLevels[0].altitude) {
-                        return sortedLevels[0];
-                    }
-
-                    // Wenn über dem Maximum, verwende höchstes Level
-                    if (!upper && sortedLevels.length > 0 && altitude > sortedLevels[sortedLevels.length - 1].altitude) {
-                        return sortedLevels[sortedLevels.length - 1];
-                    }
-
-                    // Interpoliere zwischen lower und upper
-                    if (lower && upper) {
-                        const ratio = (altitude - lower.altitude) / (upper.altitude - lower.altitude);
-
-                        // Interpoliere Windgeschwindigkeit
-                        const windSpeed = lower.wind_speed + (upper.wind_speed - lower.wind_speed) * ratio;
-
-                        // Interpoliere Windrichtung (berücksichtige Winkel-Wrapping)
-                        let windDir = lower.wind_direction;
-                        const dirDiff = upper.wind_direction - lower.wind_direction;
-                        // Wenn Differenz > 180°, gehe über 0°
-                        if (Math.abs(dirDiff) > 180) {
-                            if (dirDiff > 0) {
-                                windDir = lower.wind_direction + (360 - dirDiff) * ratio;
-                            } else {
-                                windDir = lower.wind_direction + (360 + dirDiff) * ratio;
-                            }
-                            windDir = windDir % 360;
-                        } else {
-                            windDir = lower.wind_direction + dirDiff * ratio;
-                        }
-
-                        return {
-                            altitude: altitude,
-                            wind_speed: windSpeed,
-                            wind_direction: windDir,
-                            pressure: lower.pressure + (upper.pressure - lower.pressure) * ratio,
-                            temperature: lower.temperature + (upper.temperature - lower.temperature) * ratio
-                        };
-                    }
-
-                    // Fallback: erstes Level
-                    return sortedLevels[0] || null;
-                }
-
-                // Erstelle interpolierten Levels für alle 200m-Schritte
-                const interpolatedLevels = [];
-                for (let h = Math.ceil(minAltitude / yTickStep) * yTickStep; h <= maxAltitude; h += yTickStep) {
-                    const interpolated = interpolateWind(h, profile.levels);
-                    if (interpolated) {
-                        interpolatedLevels.push(interpolated);
-                    }
-                }
-
-                // Draw wind arrows for interpolated levels (alle 200m)
-                interpolatedLevels.forEach(level => {
-                    const cy = yScale(level.altitude);
-                    const windSpeed = level.wind_speed;
-
-                    // Pfeillänge basierend auf Windgeschwindigkeit (dynamisch, max 40 km/h)
-                    const arrowLength = baseArrowSize + (Math.min(windSpeed, maxWindSpeed) / maxWindSpeed) * (maxArrowLength - baseArrowSize);
-
-                    // Farbe basierend auf Windgeschwindigkeit
-                    const arrowColor = windColorScale(windSpeed);
-
-                    // Windrichtung: Pfeil zeigt woher der Wind kommt (+180 Grad)
-                    const rot = (level.wind_direction + 180) % 360;
-
-                    const arrowG = g.append('g')
-                        .attr('transform', `translate(${cx},${cy}) rotate(${rot})`)
-                        .style('cursor', 'pointer');
-
-                    // Arrow body (line) - Länge basierend auf Windgeschwindigkeit
-                    arrowG.append('line')
-                        .attr('x1', 0).attr('y1', arrowLength)
-                        .attr('x2', 0).attr('y2', -arrowLength)
-                        .attr('stroke', arrowColor).attr('stroke-width', 2.5);
-
-                    // Arrow head - Größe proportional zur Pfeillänge
-                    const headSize = Math.max(4, arrowLength * 0.3);
-                    arrowG.append('polygon')
-                        .attr('points', `0,${-arrowLength} ${-headSize},${-arrowLength + headSize * 1.5} ${headSize},${-arrowLength + headSize * 1.5}`)
-                        .attr('fill', arrowColor);
-
-                    // Windrichtungs-Label größer und besser lesbar
-                    g.append('text')
-                        .attr('x', cx + 15).attr('y', cy + 5)
-                        .attr('fill', arrowColor).attr('opacity', 0.9)
-                        .style('font-size', '11px').style('font-weight', '700')
-                        .text(getWindDirectionName(level.wind_direction));
-
-                    // Windgeschwindigkeit-Label
-                    g.append('text')
-                        .attr('x', cx + 15).attr('y', cy + 18)
-                        .attr('fill', arrowColor).attr('opacity', 0.7)
-                        .style('font-size', '9px').style('font-weight', '600')
-                        .text(`${windSpeed.toFixed(0)} km/h`);
-
-                    // Invisible hover target (größer für bessere Interaktion)
-                    arrowG.append('circle')
-                        .attr('r', Math.max(12, arrowLength + 5)).attr('fill', 'transparent')
-                        .attr('opacity', 0)
-                        .style('pointer-events', 'all')
-                        .on('mouseover', function (event) {
-                            arrowG.select('line').attr('stroke-width', 4);
-                            const time = new Date(profile.time);
-                            tooltip.style('opacity', 1)
-                                .style('left', (event.pageX + 15) + 'px')
-                                .style('top', (event.pageY - 15) + 'px')
-                                .html(`<div style="font-weight:800;border-bottom:1px solid rgba(255,255,255,0.1);margin-bottom:6px;padding-bottom:3px;">
-                                    ${formatTime(time)} Uhr - ${level.altitude.toFixed(0)}m MSL</div>
-                                    <div class="tooltip-row"><span class="tooltip-label">Windgeschwindigkeit</span><span class="tooltip-value">${windSpeed.toFixed(1)} km/h</span></div>
-                                    <div class="tooltip-row"><span class="tooltip-label">Windrichtung</span><span class="tooltip-value">${level.wind_direction.toFixed(0)}\u00b0 (${getWindDirectionName(level.wind_direction)})</span></div>
-                                    <div class="tooltip-row"><span class="tooltip-label">Druck</span><span class="tooltip-value">${level.pressure} hPa</span></div>
-                                    <div class="tooltip-row"><span class="tooltip-label">Temperatur</span><span class="tooltip-value">${level.temperature.toFixed(1)}\u00b0C</span></div>`);
-                        })
-                        .on('mouseout', function () {
-                            arrowG.select('line').attr('stroke-width', 2.5);
-                            tooltip.style('opacity', 0);
-                        });
-                });
-            });
-
-            // Axes - Domain-Paths ohne Werte (nur Ticks zeigen Werte)
-            const xAxis = d3.axisBottom(xScale).ticks(d3.timeHour.every(1)).tickFormat(formatTime);
-
-            // X-Achse
-            const xAxisG = g.append('g').attr('class', 'axis').attr('transform', `translate(0,${height})`);
-            xAxisG.call(xAxis);
-            // Entferne Domain-Path komplett (die Linie am Ende der Achse)
-            xAxisG.select('.domain').remove();
-
-            // Y-Achse - Ticks alle 200 m
-            const yAxis = d3.axisLeft(yScale).tickValues(yTicks);
-            const yAxisG = g.append('g').attr('class', 'axis');
-            yAxisG.call(yAxis);
-            // Entferne Domain-Path komplett (die Linie am Ende der Achse)
-            yAxisG.select('.domain').remove();
-
-            // Axis labels
-            g.append('text').attr('x', width / 2).attr('y', height + 35)
-                .attr('text-anchor', 'middle').attr('fill', 'var(--color-text-light)')
-                .style('font-size', '12px').style('font-weight', '600')
-                .text('Zeit');
-            g.append('text').attr('transform', 'rotate(-90)')
-                .attr('x', -height / 2).attr('y', -45)
-                .attr('text-anchor', 'middle').attr('fill', 'var(--color-text-light)')
-                .style('font-size', '12px').style('font-weight', '600')
-                .text('Höhe über Meer (m MSL)');
-
-            // Legend für Windgeschwindigkeit
-            const legendWidth = 200;
-            const legend = svg.append('g')
-                .attr('transform', `translate(${width + margin.left - legendWidth - 10},${margin.top})`);
-
-            legend.append('text').attr('x', 0).attr('y', 0)
-                .attr('fill', 'var(--color-text-light)')
-                .style('font-size', '11px').style('font-weight', '700')
-                .text('Windgeschwindigkeit:');
-
-            const lgDefs = svg.append('defs');
-            const lgGrad = lgDefs.append('linearGradient')
-                .attr('id', 'legend-wind-gradient').attr('x1', '0%').attr('x2', '100%');
-            for (let i = 0; i <= 10; i++) {
-                lgGrad.append('stop').attr('offset', (i * 10) + '%')
-                    .attr('stop-color', windColorScale((i / 10) * maxWindSpeed));
-            }
-
-            legend.append('rect').attr('x', 0).attr('y', 5)
-                .attr('width', legendWidth).attr('height', 14)
-                .attr('fill', 'url(#legend-wind-gradient)').attr('rx', 3);
-
-            legend.append('text').attr('x', 0).attr('y', 30)
-                .attr('fill', 'var(--color-text-light)').style('font-size', '9px')
-                .text('0 km/h');
-            legend.append('text').attr('x', legendWidth).attr('y', 30)
-                .attr('text-anchor', 'end').attr('fill', 'var(--color-text-light)').style('font-size', '9px')
-                .text(`${maxWindSpeed} km/h`);
-
-            // Hinweis: Pfeillänge = Windgeschwindigkeit
-            legend.append('text').attr('x', 0).attr('y', 45)
-                .attr('fill', 'var(--color-text-light)').style('font-size', '9px').style('font-style', 'italic')
-                .text('Pfeillänge = Windgeschwindigkeit');
-        }
-
         // ========== TRIGGER UPDATE ==========
         document.getElementById('trigger-update-btn').addEventListener('click', async function () {
             const btn = this;
             const msg = document.getElementById('update-message');
+            const hero = document.getElementById('hero-banner');
+            const heroStatus = document.getElementById('hero-status');
+            const heroSummary = document.getElementById('hero-summary');
             btn.disabled = true;
             const orig = btn.textContent;
-            btn.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-width:2px;display:inline-block;"></span> ...';
+            btn.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-width:2px;display:inline-block;"></span> Wird geladen...';
             msg.className = 'update-message';
             msg.textContent = '';
+
+            // Progress bar in hero einbauen
+            heroStatus.textContent = 'Daten werden geladen';
+            heroSummary.innerHTML = '';
+            document.getElementById('hero-meta').style.display = 'none';
+            document.getElementById('hero-confidence').style.display = 'none';
+
+            const progressHtml = `
+                <div class="loading-progress" id="loading-progress">
+                    <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+                    <div class="progress-steps">
+                        <span id="step-fetch" class="active">☁ Wetter abrufen</span>
+                        <span id="step-llm">🤖 LLM-Analyse</span>
+                        <span id="step-save">💾 Speichern</span>
+                        <span id="step-done">✅ Fertig</span>
+                    </div>
+                </div>`;
+            heroSummary.innerHTML = progressHtml;
+
+            const steps = ['step-fetch', 'step-llm', 'step-save', 'step-done'];
+            const pcts = [15, 50, 80, 100];
+            const labels = ['Wetterdaten werden abgerufen...', 'LLM analysiert Flugbedingungen...', 'Ergebnisse werden gespeichert...', 'Fertig!'];
+
+            function setStep(idx) {
+                const fill = document.getElementById('progress-fill');
+                if (fill) fill.style.width = pcts[idx] + '%';
+                if (heroStatus) heroStatus.textContent = labels[idx];
+                steps.forEach((s, i) => {
+                    const el = document.getElementById(s);
+                    if (el) el.className = i < idx ? 'done' : (i === idx ? 'active' : '');
+                });
+            }
+
+            // Simuliere Fortschritt waehrend der Anfrage laeuft
+            setStep(0);
+            const stepTimers = [
+                setTimeout(() => setStep(1), 3000),
+                setTimeout(() => setStep(2), 8000)
+            ];
+
             try {
                 const resp = await fetch('/api/trigger-update', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+                if (!resp.ok) throw new Error('API Fehler: ' + resp.status);
                 const data = await resp.json();
+                stepTimers.forEach(clearTimeout);
+
                 if (data.success) {
+                    setStep(3);
                     msg.className = 'update-message success';
                     msg.textContent = 'Aktualisiert! Seite wird neu geladen...';
-                    setTimeout(() => window.location.reload(), 2000);
+                    setTimeout(() => window.location.reload(), 1500);
                 } else {
                     msg.className = 'update-message error';
                     msg.textContent = data.error || 'Fehler';
+                    heroStatus.textContent = 'Fehler beim Laden';
+                    heroSummary.textContent = data.error || 'Unbekannter Fehler';
                     btn.disabled = false; btn.textContent = orig;
                 }
             } catch (e) {
+                stepTimers.forEach(clearTimeout);
                 msg.className = 'update-message error';
                 msg.textContent = 'Netzwerkfehler: ' + e.message;
+                heroStatus.textContent = 'Verbindungsfehler';
+                heroSummary.textContent = e.message;
                 btn.disabled = false; btn.textContent = orig;
             }
         });

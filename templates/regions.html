@@ -1,0 +1,932 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Regionale Thermik-Vorhersage - Uetliberg Ticker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <!-- D3.js + Meteogram (fuer Overlay-Chart) -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="/static/js/meteogram.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+        :root {
+            --color-bg: #0F172A;
+            --color-card: #1E293B;
+            --color-accent: #6366F1;
+            --color-text: #F8FAFC;
+            --color-text-muted: #94A3B8;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--color-bg);
+            background-image: radial-gradient(circle at 50% 0%, #1E293B 0%, #0F172A 100%);
+            color: var(--color-text);
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Top Header Navigation */
+        .navbar {
+            background-color: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 0.75rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .navbar-brand {
+            font-weight: 700;
+            font-size: 1.25rem;
+            color: var(--color-text);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            text-decoration: none;
+        }
+
+        .navbar-links {
+            display: flex;
+            gap: 1.5rem;
+        }
+
+        .nav-link {
+            color: var(--color-text-muted);
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+        }
+
+        .nav-link:hover {
+            color: var(--color-text);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .nav-link.active {
+            color: #10B981;
+            background: rgba(16, 185, 129, 0.1);
+        }
+
+        /* Container for Map and Controls */
+        .app-container {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            position: relative;
+        }
+
+        /* Controls Area */
+        .controls-area {
+            padding: 0.75rem;
+            display: flex;
+            justify-content: center;
+            z-index: 500;
+        }
+
+        /* Wochentag Tabs */
+        .day-tabs {
+            display: flex;
+            background: rgba(30, 41, 59, 0.8);
+            backdrop-filter: blur(8px);
+            padding: 0.25rem;
+            border-radius: 0.75rem;
+            gap: 0.25rem;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .day-tab {
+            padding: 0.4rem 1rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            font-size: 0.8rem;
+            color: var(--color-text-muted);
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-width: 60px;
+        }
+
+        .day-tab .date {
+            font-size: 0.65rem;
+            font-weight: 400;
+            opacity: 0.6;
+        }
+
+        .day-tab:hover {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--color-text);
+        }
+
+        .day-tab.active {
+            background: var(--color-accent);
+            color: white;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        /* Map Container */
+        #map {
+            flex: 1;
+            width: 100%;
+            z-index: 10;
+            background: #111;
+        }
+
+        /* Polygon Rating Labels */
+        .polygon-label-wrapper {
+            pointer-events: none !important;
+        }
+        .polygon-label {
+            background: rgba(255, 255, 255, 0.92);
+            border-radius: 50%;
+            width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Inter', sans-serif;
+            font-weight: 800;
+            font-size: 12px;
+            color: #1e293b;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+            pointer-events: none;
+        }
+
+        /* Fancy Legend */
+        .map-legend {
+            position: absolute;
+            bottom: 24px;
+            right: 24px;
+            background: rgba(30, 41, 59, 0.9);
+            backdrop-filter: blur(8px);
+            padding: 12px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            z-index: 1000;
+            font-size: 0.75rem;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        .legend-title {
+            font-weight: 700;
+            margin-bottom: 8px;
+            color: var(--color-text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .legend-gradient {
+            height: 10px;
+            width: 160px;
+            background: linear-gradient(to right, rgba(200,200,200,0.3), rgba(230,175,155,0.5), rgba(220,110,100,0.6), rgba(200,70,60,0.7), rgba(160,30,20,0.8));
+            border-radius: 5px;
+            margin-bottom: 4px;
+        }
+
+        .legend-labels {
+            display: flex;
+            justify-content: space-between;
+            color: var(--color-text-muted);
+        }
+
+        /* Leaflet Overrides */
+        .leaflet-container {
+            background: #111;
+        }
+
+        /* Tooltip and Popup styling */
+        .leaflet-popup-content-wrapper {
+            background: var(--color-card);
+            color: var(--color-text);
+            border-radius: 12px;
+            padding: 0;
+        }
+
+        .leaflet-popup-tip {
+            background: var(--color-card);
+        }
+
+        .popup-metric {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 12px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .popup-header {
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.05);
+            font-weight: 700;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* ===== METEOGRAM OVERLAY ===== */
+        .meteogram-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 2000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 1;
+            transition: opacity 0.25s ease;
+        }
+        .meteogram-overlay.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+        .meteogram-backdrop {
+            position: absolute;
+            inset: 0;
+            background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(6px);
+        }
+        .meteogram-content {
+            position: relative;
+            width: 95vw;
+            max-width: 1400px;
+            max-height: 95vh;
+            background: rgba(30,41,59,0.95);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 20px;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.5);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .meteogram-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 24px;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        .meteogram-header h2 {
+            font-size: 20px;
+            font-weight: 700;
+            margin: 0;
+        }
+        .meteogram-header .overlay-subtitle {
+            font-size: 13px;
+            color: #94A3B8;
+            margin-left: 8px;
+        }
+        .overlay-close {
+            width: 36px;
+            height: 36px;
+            border: none;
+            background: rgba(255,255,255,0.08);
+            color: #F8FAFC;
+            font-size: 22px;
+            border-radius: 10px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+        }
+        .overlay-close:hover {
+            background: rgba(255,255,255,0.18);
+        }
+        .overlay-loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 300px;
+            color: #94A3B8;
+            font-size: 14px;
+            gap: 10px;
+        }
+        .overlay-loading .spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(99,102,241,0.2);
+            border-top-color: #6366F1;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Meteogram-spezifische Styles im Overlay */
+        .meteogram-overlay .chart-card {
+            flex: 1;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            background: transparent;
+            border: none;
+            border-radius: 0;
+            box-shadow: none;
+        }
+        .meteogram-overlay .chart-container {
+            position: relative;
+            overflow-x: auto;
+            overflow-y: hidden;
+            -webkit-overflow-scrolling: touch;
+            flex: 1;
+        }
+        .meteogram-overlay .legend-bar {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+            padding: 12px 24px;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+            flex-wrap: wrap;
+        }
+        .meteogram-overlay .legend-section { display:flex;align-items:center;gap:8px; }
+        .meteogram-overlay .legend-label { font-size:11px;font-weight:600;color:#94A3B8;text-transform:uppercase;letter-spacing:0.5px; }
+        .meteogram-overlay .legend-scale { display:flex;align-items:center;gap:2px; }
+        .meteogram-overlay .legend-swatch { width:28px;height:14px;border-radius:3px; }
+        .meteogram-overlay .legend-swatch-label { font-size:10px;color:#64748B;text-align:center;width:28px; }
+        .meteogram-overlay .legend-gradient { width:120px;height:14px;border-radius:3px; }
+        .meteogram-overlay .legend-gradient-labels { display:flex;justify-content:space-between;width:120px; }
+        .meteogram-overlay .legend-gradient-labels span { font-size:10px;color:#64748B; }
+        .meteogram-overlay .legend-item { display:flex;align-items:center;gap:4px; }
+        .meteogram-overlay .legend-cloud-label { font-size:11px;color:#94A3B8; }
+        .meteogram-overlay .tab-bar { display:flex;gap:4px;background:rgba(255,255,255,0.05);border-radius:10px;padding:3px; }
+        .meteogram-overlay .tab-btn { padding:7px 14px;border:none;background:transparent;font-family:inherit;font-size:12px;font-weight:600;color:#94A3B8;border-radius:8px;cursor:pointer;transition:all 0.2s; }
+        .meteogram-overlay .tab-btn:hover { color:#F8FAFC; }
+        .meteogram-overlay .tab-btn.active { background:rgba(99,102,241,0.3);color:#F8FAFC; }
+        .meteogram-overlay .error-state { display:flex;align-items:center;justify-content:center;height:300px;color:#DC2626;font-size:14px; }
+
+        /* SVG-Styles fuer Chart im Overlay */
+        .meteogram-overlay .grid-line { stroke:rgba(255,255,255,0.08);stroke-width:0.5; }
+        .meteogram-overlay .axis-label { font-family:'Inter',sans-serif;font-size:12px;font-weight:500;fill:#94A3B8; }
+        .meteogram-overlay .time-label { font-family:'Inter',sans-serif;font-size:13px;font-weight:600;fill:#F8FAFC; }
+        .meteogram-overlay .wind-value { font-family:'Inter',sans-serif;font-weight:600;dominant-baseline:central;text-anchor:middle;pointer-events:none; }
+        .meteogram-overlay .ground-bg { fill:rgba(255,255,255,0.02); }
+        .meteogram-overlay .ground-divider { stroke:rgba(255,255,255,0.1);stroke-width:1; }
+        .meteogram-overlay .ground-label { font-family:'Inter',sans-serif;font-size:10px;font-weight:600;fill:#94A3B8;text-transform:uppercase;letter-spacing:0.3px; }
+        .meteogram-overlay .ground-value { font-family:'Inter',sans-serif;font-size:11px;font-weight:600;text-anchor:middle; }
+        .meteogram-overlay .ground-temp { fill:#818CF8; }
+        .meteogram-overlay .ground-precip-bar { opacity:0.7; }
+        .meteogram-overlay .crosshair-v, .meteogram-overlay .crosshair-h { stroke:#F8FAFC;stroke-width:0.5;opacity:0;transition:opacity 0.15s;pointer-events:none; }
+        .meteogram-overlay .crosshair-v.visible, .meteogram-overlay .crosshair-h.visible { opacity:0.2; }
+
+        /* Overlay-Tooltip */
+        .meteogram-overlay .tooltip {
+            position: fixed;
+            pointer-events: none;
+            background: rgba(30,41,59,0.95);
+            backdrop-filter: blur(8px);
+            border-radius: 12px;
+            padding: 14px 16px;
+            box-shadow: 0 20px 25px rgba(0,0,0,0.2);
+            font-size: 12px;
+            line-height: 1.6;
+            opacity: 0;
+            transition: opacity 0.15s;
+            z-index: 2100;
+            min-width: 180px;
+            border: 1px solid rgba(255,255,255,0.1);
+            color: #F8FAFC;
+        }
+        .meteogram-overlay .tooltip.visible { opacity:1; }
+        .meteogram-overlay .tooltip-title { font-weight:700;font-size:13px;margin-bottom:6px; }
+        .meteogram-overlay .tooltip-row { display:flex;justify-content:space-between;gap:16px; }
+        .meteogram-overlay .tooltip-label { color:#94A3B8; }
+        .meteogram-overlay .tooltip-value { font-weight:600; }
+
+        /* Custom Region-Tooltip (nicht Leaflet, sondern eigener Div) */
+        #region-hover-tooltip {
+            position: fixed;
+            z-index: 1500;
+            pointer-events: none;
+            background: var(--color-card);
+            color: var(--color-text);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+            max-width: 280px;
+            opacity: 0;
+            transition: opacity 0.12s;
+        }
+        #region-hover-tooltip.visible { opacity: 1; }
+
+        /* Referenzpunkt-Tooltip */
+        .ref-point-tooltip {
+            background: rgba(15, 23, 42, 0.92);
+            color: #F8FAFC;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 6px;
+            padding: 4px 10px;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.75rem;
+            font-weight: 600;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+        }
+
+        .ref-point-tooltip::before {
+            border-top-color: rgba(15, 23, 42, 0.92);
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Navbar -->
+    <nav class="navbar">
+        <a href="/" class="navbar-brand">
+            <i class="ph ph-wind text-emerald-400"></i>
+            RegTherm
+        </a>
+        <div class="navbar-links">
+            <a href="/" class="nav-link">Dashboard</a>
+            <a href="/meteo" class="nav-link">Meteogramm</a>
+            <a href="/emagramm" class="nav-link">Emagramm</a>
+            <a href="/regions" class="nav-link active">Landkarte</a>
+        </div>
+    </nav>
+
+    <!-- Main Container -->
+    <div class="app-container">
+
+        <!-- Controls (Day Tabs) -->
+        <div class="controls-area">
+            <div class="day-tabs" id="dayTabsContainer"></div>
+        </div>
+
+        <!-- The Map -->
+        <div id="map"></div>
+
+        <!-- Meteogram Overlay -->
+        <div id="meteogram-overlay" class="meteogram-overlay hidden">
+            <div class="meteogram-backdrop" onclick="closeMeteogramOverlay()"></div>
+            <div class="meteogram-content">
+                <div class="meteogram-header">
+                    <div>
+                        <h2 id="overlay-title">Region</h2>
+                        <span class="overlay-subtitle" id="overlay-subtitle"></span>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:12px">
+                        <div class="tab-bar" id="overlay-tabs"></div>
+                        <button class="overlay-close" onclick="closeMeteogramOverlay()">&times;</button>
+                    </div>
+                </div>
+                <div class="chart-card">
+                    <div class="legend-bar">
+                        <div class="legend-section">
+                            <span class="legend-label">Wind</span>
+                            <div>
+                                <div class="legend-scale">
+                                    <div class="legend-swatch" style="background:#059669"></div>
+                                    <div class="legend-swatch" style="background:#10B981"></div>
+                                    <div class="legend-swatch" style="background:#D97706"></div>
+                                    <div class="legend-swatch" style="background:#EA580C"></div>
+                                    <div class="legend-swatch" style="background:#DC2626"></div>
+                                </div>
+                                <div class="legend-scale">
+                                    <div class="legend-swatch-label">0</div>
+                                    <div class="legend-swatch-label">10</div>
+                                    <div class="legend-swatch-label">20</div>
+                                    <div class="legend-swatch-label">25</div>
+                                    <div class="legend-swatch-label">30+</div>
+                                </div>
+                            </div>
+                            <span style="font-size:10px;color:#64748B">km/h</span>
+                        </div>
+                        <div class="legend-section">
+                            <span class="legend-label">Thermik</span>
+                            <div>
+                                <div class="legend-gradient" style="background:linear-gradient(to right, transparent, #FDE047, #FB923C, #F87171)"></div>
+                                <div class="legend-gradient-labels">
+                                    <span>0</span>
+                                    <span>300</span>
+                                    <span>600+</span>
+                                </div>
+                            </div>
+                            <span style="font-size:10px;color:#64748B">CAPE J/kg</span>
+                        </div>
+                        <div class="legend-item">
+                            <svg width="20" height="20" viewBox="0 0 24 24"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" fill="#F3F4F6" stroke="#4B5563" stroke-width="1.5"></path></svg>
+                            <span class="legend-cloud-label" style="margin-left:4px;">Wolkenbasis</span>
+                        </div>
+                    </div>
+                    <div class="chart-container" id="overlay-chart">
+                    </div>
+                </div>
+                <div class="tooltip" id="overlay-tooltip"></div>
+            </div>
+        </div>
+
+        <!-- Legend -->
+        <div class="map-legend">
+            <div class="legend-title">Thermik-Rating</div>
+            <div class="legend-gradient"></div>
+            <div class="legend-labels">
+                <span>Schwach</span>
+                <span>Hammer</span>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Custom Hover-Tooltip (nicht Leaflet) -->
+    <div id="region-hover-tooltip"></div>
+
+    <!-- Application Script -->
+    <script>
+        let apiData = {};
+        let polygonGeoJSON = null;
+        let referencePointsGeoJSON = null;
+        let cantonsData = null;
+        let map;
+        let polygonLayer = null;
+        let labelLayer = null;
+        let refPointsLayer = null;
+        let activeHoverLayer = null;
+        let cantonsLayer = null;
+        let datesMap = [];
+        let selectedDateIndex = 0;
+
+        // XC-Therm style: gray/white for no thermal, pink/red for stronger thermal
+        function ratingToColor(rating) {
+            if (rating <= 0) return 'rgba(200, 200, 200, 0.15)';
+            if (rating <= 1) return 'rgba(220, 200, 190, 0.3)';
+            if (rating <= 2) return 'rgba(230, 190, 170, 0.4)';
+            if (rating <= 3) return 'rgba(235, 175, 155, 0.45)';
+            if (rating <= 4) return 'rgba(240, 160, 140, 0.5)';
+            if (rating <= 5) return 'rgba(230, 130, 120, 0.55)';
+            if (rating <= 6) return 'rgba(220, 110, 100, 0.55)';
+            if (rating <= 7) return 'rgba(210, 90, 80, 0.6)';
+            if (rating <= 8) return 'rgba(200, 70, 60, 0.65)';
+            if (rating <= 9) return 'rgba(185, 50, 40, 0.7)';
+            return 'rgba(160, 30, 20, 0.75)';
+        }
+
+        function initMap() {
+            map = L.map('map', {
+                zoomControl: false,
+                attributionControl: false
+            }).setView([46.82, 8.2], 8);
+
+            // Simple shaded relief base map (like XC-Therm)
+            L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Shaded_Relief/MapServer/tile/{z}/{y}/{x}', {
+                maxZoom: 13,
+                attribution: 'Esri'
+            }).addTo(map);
+
+            L.control.zoom({ position: 'bottomleft' }).addTo(map);
+        }
+
+        function generateDaysLayout() {
+            const tabsContainer = document.getElementById('dayTabsContainer');
+            tabsContainer.innerHTML = '';
+            const today = new Date();
+            const shortDays = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+
+            for (let i = 0; i < 7; i++) {
+                const d = new Date(today);
+                d.setDate(today.getDate() + i);
+                const dateStr = d.toISOString().split('T')[0];
+                const dayName = i === 0 ? 'Heute' : i === 1 ? 'Morgen' : shortDays[d.getDay()];
+                const dateLbl = `${d.getDate()}.${d.getMonth() + 1}.`;
+
+                datesMap.push({ dateString: dateStr, dayName: dayName, dateLabel: dateLbl });
+
+                const btn = document.createElement('div');
+                btn.className = `day-tab ${i === 0 ? 'active' : ''}`;
+                btn.innerHTML = `${dayName}<span class="date">${dateLbl}</span>`;
+                btn.addEventListener('click', () => selectDay(i));
+                tabsContainer.appendChild(btn);
+            }
+        }
+
+        async function loadData() {
+            try {
+                // Alle 4 Datenquellen parallel laden
+                const [regionsRes, polyRes, pointsRes, cantonsRes] = await Promise.all([
+                    fetch('/api/regions-data'),
+                    fetch('/data/regionen_polygone_mapped.geojson'),
+                    fetch('/data/regionen_referenzpunkte.geojson'),
+                    fetch('/data/swiss_cantons.geojson').catch(() => null)
+                ]);
+
+                apiData = await regionsRes.json();
+                polygonGeoJSON = await polyRes.json();
+                referencePointsGeoJSON = await pointsRes.json();
+
+                // Kantonsgrenzen (optionaler Overlay)
+                if (cantonsRes && cantonsRes.ok) {
+                    cantonsData = await cantonsRes.json();
+                    renderCantonOverlay();
+                }
+
+                renderPolygons(datesMap[0].dateString);
+                renderReferencePoints();
+            } catch (err) {
+                console.error("Fehler beim Laden:", err);
+            }
+        }
+
+        function selectDay(index) {
+            selectedDateIndex = index;
+            document.querySelectorAll('.day-tab').forEach((tab, i) => tab.classList.toggle('active', i === index));
+            renderPolygons(datesMap[index].dateString);
+        }
+
+        function getPolygonCenter(geometry) {
+            let coords;
+            if (geometry.type === 'MultiPolygon') {
+                let maxArea = 0, best = geometry.coordinates[0][0];
+                for (const poly of geometry.coordinates) {
+                    const ring = poly[0];
+                    let area = 0;
+                    for (let i = 0; i < ring.length - 1; i++) {
+                        area += ring[i][0] * ring[i + 1][1] - ring[i + 1][0] * ring[i][1];
+                    }
+                    if (Math.abs(area) > maxArea) { maxArea = Math.abs(area); best = ring; }
+                }
+                coords = best;
+            } else {
+                coords = geometry.coordinates[0];
+            }
+            let latSum = 0, lonSum = 0;
+            const n = coords.length - 1;
+            for (let i = 0; i < n; i++) {
+                lonSum += coords[i][0];
+                latSum += coords[i][1];
+            }
+            return [latSum / n, lonSum / n];
+        }
+
+        function renderCantonOverlay() {
+            if (!cantonsData) return;
+            if (cantonsLayer) map.removeLayer(cantonsLayer);
+
+            cantonsLayer = L.geoJSON(cantonsData, {
+                style: {
+                    fillColor: 'transparent',
+                    fillOpacity: 0,
+                    color: '#22c55e',
+                    weight: 2,
+                    opacity: 0.7
+                },
+                interactive: false
+            }).addTo(map);
+        }
+
+        function renderReferencePoints() {
+            if (!referencePointsGeoJSON) return;
+            if (refPointsLayer) map.removeLayer(refPointsLayer);
+
+            refPointsLayer = L.geoJSON(referencePointsGeoJSON, {
+                pointToLayer: function (feature, latlng) {
+                    return L.circleMarker(latlng, {
+                        radius: 4,
+                        fillColor: '#1E293B',
+                        color: '#FFFFFF',
+                        weight: 2,
+                        opacity: 1,
+                        fillOpacity: 0.9
+                    });
+                },
+                onEachFeature: function (feature, layer) {
+                    const name = feature.properties.name || '';
+                    const elev = feature.properties.elevation_ref;
+                    const tooltipText = elev ? `${name} (${elev}m)` : name;
+                    layer.bindTooltip(tooltipText, {
+                        permanent: false,
+                        direction: 'top',
+                        className: 'ref-point-tooltip',
+                        offset: [0, -6]
+                    });
+                }
+            }).addTo(map);
+
+            // Referenzpunkte immer ganz oben
+            refPointsLayer.bringToFront();
+        }
+
+        function renderPolygons(dateString) {
+            if (polygonLayer) map.removeLayer(polygonLayer);
+            if (labelLayer) map.removeLayer(labelLayer);
+
+            if (!polygonGeoJSON) return;
+
+            labelLayer = L.layerGroup();
+
+            polygonLayer = L.geoJSON(polygonGeoJSON, {
+                style: function (feature) {
+                    const regionId = feature.properties.id;
+                    const region = apiData[regionId];
+                    let rating = 0;
+                    if (region && region.daily && region.daily[dateString]) {
+                        rating = Math.round(region.daily[dateString].rating);
+                    }
+                    return {
+                        fillColor: ratingToColor(rating),
+                        fillOpacity: 1,
+                        color: 'rgba(80, 80, 80, 0.4)',
+                        weight: 0.5,
+                        opacity: 1
+                    };
+                },
+                onEachFeature: function (feature, layer) {
+                    const regionId = feature.properties.id;
+                    const regionName = feature.properties.region || feature.properties.name || '';
+
+                    // Polygone ohne Zuordnung: kein Popup, kein Label
+                    if (!regionId) return;
+
+                    const region = apiData[regionId];
+                    let rating = 0, climbRate = 0, lcl = 0, maxHeight = 0;
+                    if (region && region.daily && region.daily[dateString]) {
+                        const stats = region.daily[dateString];
+                        rating = Math.round(stats.rating);
+                        climbRate = stats.climb_rate;
+                        lcl = stats.lcl;
+                        maxHeight = stats.max_height;
+                    }
+
+                    const startName = feature.properties.name || '';
+                    const elevRef = feature.properties.elevation_ref;
+
+                    const tooltipHtml = `
+                        <div class="popup-header">${regionName}</div>
+                        <div class="popup-metric"><span style="color:var(--color-text-muted)">Startplatz</span><span style="font-weight:600">${startName}</span></div>
+                        ${elevRef ? `<div class="popup-metric"><span>Start-Elevation</span><span style="font-weight:700">${elevRef}m</span></div>` : ''}
+                        <div class="popup-metric"><span>Rating</span><span style="font-weight:700">${rating}/10</span></div>
+                        <div class="popup-metric"><span>Steigen</span><span style="font-weight:700">${climbRate.toFixed(1)} m/s</span></div>
+                        <div class="popup-metric"><span>Arbeitsh&ouml;he</span><span style="font-weight:700">${maxHeight}m</span></div>
+                        <div class="popup-metric" style="border:0"><span>Basis</span><span style="font-weight:700">${lcl}m</span></div>
+                        <div style="text-align:center;padding:6px 0 2px;color:#818CF8;font-size:11px;font-weight:600">Klick f&uuml;r Meteogramm</div>
+                    `;
+                    layer._customTooltipHtml = tooltipHtml;
+
+                    layer.on('click', function (e) {
+                        L.DomEvent.stopPropagation(e);
+                        hideRegionTooltip();
+                        try {
+                            openMeteogramOverlay(regionId, regionName, feature.properties);
+                        } catch (err) {
+                            console.error('Overlay-Fehler:', err);
+                        }
+                    });
+
+                    layer.on('mouseover', function () {
+                        if (activeHoverLayer && activeHoverLayer !== this) {
+                            polygonLayer.resetStyle(activeHoverLayer);
+                        }
+                        activeHoverLayer = this;
+                        this.setStyle({ fillOpacity: 1, weight: 2, color: '#111' });
+                        this.bringToFront();
+                        if (cantonsLayer) cantonsLayer.bringToFront();
+                        if (refPointsLayer) refPointsLayer.bringToFront();
+                        showRegionTooltip(this._customTooltipHtml);
+                    });
+                    layer.on('mousemove', function (e) {
+                        positionRegionTooltip(e.originalEvent);
+                    });
+                    layer.on('mouseout', function () {
+                        polygonLayer.resetStyle(this);
+                        if (activeHoverLayer === this) {
+                            hideRegionTooltip();
+                            activeHoverLayer = null;
+                        }
+                    });
+
+                    // Rating-Zahl als Label in der Polygon-Mitte
+                    const center = getPolygonCenter(feature.geometry);
+                    const label = L.marker(center, {
+                        icon: L.divIcon({
+                            html: `<div class="polygon-label">${rating}</div>`,
+                            className: 'polygon-label-wrapper',
+                            iconSize: [28, 28],
+                            iconAnchor: [14, 14]
+                        }),
+                        interactive: false
+                    });
+                    labelLayer.addLayer(label);
+                }
+            }).addTo(map);
+
+            labelLayer.addTo(map);
+
+            // Layer-Reihenfolge: Polygone -> Kantone -> Referenzpunkte (oben)
+            if (cantonsLayer) cantonsLayer.bringToFront();
+            if (refPointsLayer) refPointsLayer.bringToFront();
+        }
+
+        // ===== CUSTOM HOVER TOOLTIP =====
+        var hoverTooltipEl = document.getElementById('region-hover-tooltip');
+
+        function showRegionTooltip(html) {
+            hoverTooltipEl.innerHTML = html;
+            hoverTooltipEl.classList.add('visible');
+        }
+        function positionRegionTooltip(evt) {
+            var x = evt.clientX + 16;
+            var y = evt.clientY - 10;
+            var w = hoverTooltipEl.offsetWidth;
+            var h = hoverTooltipEl.offsetHeight;
+            if (x + w + 8 > window.innerWidth) x = evt.clientX - w - 16;
+            if (y + h + 8 > window.innerHeight) y = evt.clientY - h - 16;
+            if (y < 8) y = 8;
+            hoverTooltipEl.style.left = x + 'px';
+            hoverTooltipEl.style.top = y + 'px';
+        }
+        function hideRegionTooltip() {
+            hoverTooltipEl.classList.remove('visible');
+        }
+
+        // ===== METEOGRAM OVERLAY =====
+        var overlayData = null;
+
+        async function openMeteogramOverlay(regionId, name, props) {
+            var overlay = document.getElementById('meteogram-overlay');
+            var chartEl = document.getElementById('overlay-chart');
+            var tabsEl = document.getElementById('overlay-tabs');
+            var titleEl = document.getElementById('overlay-title');
+            var subtitleEl = document.getElementById('overlay-subtitle');
+
+            titleEl.textContent = name || regionId;
+            subtitleEl.textContent = '';
+            tabsEl.innerHTML = '';
+            chartEl.innerHTML = '<div class="overlay-loading"><div class="spinner"></div>Lade Meteogramm...</div>';
+            overlay.classList.remove('hidden');
+
+            try {
+                var resp = await fetch('/api/region-weather/' + encodeURIComponent(regionId));
+                overlayData = await resp.json();
+
+                if (!overlayData.success) {
+                    chartEl.innerHTML = '<div class="error-state">' + (overlayData.error || 'Fehler') + '</div>';
+                    return;
+                }
+
+                var loc = overlayData.location || {};
+                subtitleEl.textContent = (loc.name || '') + (loc.elevation_ref ? ' (' + loc.elevation_ref + 'm)' : '');
+
+                var dates = overlayData.altitude_wind.dates || overlayData.weather.dates || [];
+                if (dates.length === 0) {
+                    chartEl.innerHTML = '<div class="error-state">Keine Daten verfuegbar.</div>';
+                    return;
+                }
+
+                Meteogram.buildTabs(tabsEl, dates, function (d) {
+                    renderOverlayChart(d);
+                });
+
+                renderOverlayChart(dates[0]);
+            } catch (err) {
+                chartEl.innerHTML = '<div class="error-state">Fehler: ' + err.message + '</div>';
+            }
+        }
+
+        function renderOverlayChart(date) {
+            if (!overlayData) return;
+            var wxDay = overlayData.weather.days[date] || null;
+            var altDay = overlayData.altitude_wind.days[date] || null;
+            Meteogram.renderChart(
+                document.getElementById('overlay-chart'),
+                document.getElementById('overlay-tooltip'),
+                wxDay,
+                altDay,
+                { date: date }
+            );
+        }
+
+        function closeMeteogramOverlay() {
+            document.getElementById('meteogram-overlay').classList.add('hidden');
+            document.getElementById('overlay-chart').innerHTML = '';
+            overlayData = null;
+        }
+
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') closeMeteogramOverlay();
+        });
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initMap();
+            generateDaysLayout();
+            loadData();
+        });
+    </script>
+</body>
+
+</html>

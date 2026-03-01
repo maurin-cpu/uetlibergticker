@@ -2,7 +2,25 @@
   "permissions": {
     "allow": [
       "Bash(ls:*)",
-      "WebSearch"
+      "WebSearch",
+      "WebFetch(domain:xc-therm.info)",
+      "WebFetch(domain:www.xc-therm.info)",
+      "WebFetch(domain:xc-therm.ch)",
+      "WebFetch(domain:xctherm.com)",
+      "WebFetch(domain:www.aerodrome-gruyere.ch)",
+      "WebFetch(domain:lu-glidz.blogspot.com)",
+      "WebFetch(domain:www.rymann.org)",
+      "WebFetch(domain:www.myparaworld.ch)",
+      "WebFetch(domain:www.meteo.flypara.ch)",
+      "WebFetch(domain:www.paraglidingforum.com)",
+      "WebFetch(domain:www.burnair.ch)",
+      "WebFetch(domain:flugschule-jura.ch)",
+      "WebFetch(domain:flugbasis.ch)",
+      "Bash(python -c:*)",
+      "Bash(.venvScriptspython -c \"\nimport json, sys\nsys.path.insert\\(0, ''.''\\)\nfrom shapely.geometry import shape, mapping\ndata = json.load\\(open\\(r''C:\\\\Users\\\\user\\\\OneDrive\\\\Projekte\\\\map\\\\swiss_thermal_regions.geojson'', ''r'', encoding=''utf-8''\\)\\)\nfor tol in [0.001, 0.002, 0.005, 0.01]:\n    total = 0\n    for f in data[''features'']:\n        geom = shape\\(f[''geometry'']\\)\n        simplified = geom.simplify\\(tol, preserve_topology=True\\)\n        total += len\\(json.dumps\\(mapping\\(simplified\\)\\)\\)\n    print\\(f''Tolerance {tol}: ~{total/1024:.0f} KB''\\)\n\")",
+      "Bash(.venv/Scripts/python.exe:*)",
+      "Bash(dir:*)",
+      "Bash(python map_polygons.py:*)"
     ]
   }
 }

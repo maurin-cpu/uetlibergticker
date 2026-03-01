@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Open-Meteo Rohdaten - Uetliberg Ticker</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/styles/github-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: #111827;
+            color: #f3f4f6;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            background: #1f2937;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 24px;
+            color: #60a5fa;
+        }
+
+        .controls {
+            display: flex;
+            gap: 12px;
+        }
+
+        a.btn {
+            padding: 8px 16px;
+            background: #374151;
+            color: #fff;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+
+        a.btn:hover {
+            background: #4B5563;
+        }
+
+        a.btn-primary {
+            background: #2563EB;
+        }
+
+        a.btn-primary:hover {
+            background: #1D4ED8;
+        }
+
+        pre {
+            background: #1f2937;
+            padding: 20px;
+            border-radius: 12px;
+            overflow-x: auto;
+            line-height: 1.5;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        code {
+            font-family: 'JetBrains Mono', 'Fira Code', Consolas, Monaco, monospace;
+            font-size: 13px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 50px;
+            font-size: 18px;
+            color: #9CA3AF;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        <div>
+            <h1>Open-Meteo Rohdaten (JSON)</h1>
+            <div style="color: #9ca3af; font-size: 14px; margin-top: 4px;">Die formatierten Open-Meteo Daten inklusive
+                Höhenwind-Konkatenierung</div>
+        </div>
+        <div class="controls">
+            <a href="/meteo" class="btn">Meteogramm</a>
+            <a href="/regions" class="btn">Landkarte</a>
+            <a href="/emagramm" class="btn">Emagramm</a>
+            <a href="/" class="btn btn-primary">Zum Dashboard</a>
+        </div>
+    </div>
+
+    <div id="loading" class="loading">
+        ⏳ Lade formatierte Rohdaten...
+    </div>
+
+    <pre><code id="json-container" class="language-json"></code></pre>
+
+    <script>
+        async function loadData() {
+            try {
+                const res = await fetch('/api/raw-data');
+                if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+
+                const data = await res.json();
+
+                const container = document.getElementById('json-container');
+                container.textContent = JSON.stringify(data, null, 2);
+
+                // Highlight syntax
+                hljs.highlightElement(container);
+
+                document.getElementById('loading').style.display = 'none';
+            } catch (err) {
+                document.getElementById('loading').innerHTML = '<span style="color:#ef4444">❌ Fehler beim Laden der Daten: ' + err.message + '</span>';
+            }
+        }
+
+        loadData();
+    </script>
+</body>
+
+</html>
