@@ -156,27 +156,35 @@ window.Meteogram = (function () {
         function rowY(ri) { return (nRows - 1 - ri) * CELL_H; }
         var gridBottom = nRows * CELL_H;
 
-        // ===== THERMIK BACKGROUND =====
+        // ===== THERMIK BACKGROUND (Climb-Rate m/s, like XC Therm) =====
         times.forEach(function (t, ci) {
             var wx = wxByTime[t];
             if (!wx || !wx.thermik) return;
-            var cape = wx.thermik.cape || 0;
-            if (cape < 100) return;
-            var cloudBase = wx.cloudbase ? wx.cloudbase.height : null;
-            var maxAlt = cloudBase ? cloudBase : altitudes[altitudes.length - 1] + 200;
+            var climb = wx.thermik.climb_rate || 0;
+            if (climb <= 0) return;
+            // Thermal column: from ground up to max_height (thermal ceiling)
+            var maxAlt = wx.thermik.max_height || (altitudes[altitudes.length - 1] + 200);
             var topRow = altitudes.findIndex(function (a) { return a >= maxAlt; });
             var endRow = topRow >= 0 ? topRow : nRows;
 
             for (var ri = 0; ri < endRow; ri++) {
-                var fraction = 1 - (ri / endRow);
+                var fraction = 1 - (ri / endRow); // stronger at base
                 var alpha = fraction * 0.6;
-                var bgColor = cape < 300
-                    ? 'rgba(253,224,71,' + (0.12 * alpha + 0.04) + ')'
-                    : cape < 500
-                        ? 'rgba(253,224,71,' + (0.22 * alpha + 0.04) + ')'
-                        : cape < 800
-                            ? 'rgba(251,146,60,' + (0.20 * alpha + 0.04) + ')'
-                            : 'rgba(248,113,113,' + (0.20 * alpha + 0.04) + ')';
+                // Color scale: stronger alphas for better visibility
+                var bgColor;
+                if (climb < 0.5) {
+                    bgColor = 'rgba(253,224,71,' + (0.18 * alpha + 0.08) + ')';
+                } else if (climb < 1.0) {
+                    bgColor = 'rgba(253,224,71,' + (0.35 * alpha + 0.12) + ')';
+                } else if (climb < 1.5) {
+                    bgColor = 'rgba(250,204,21,' + (0.40 * alpha + 0.15) + ')';
+                } else if (climb < 2.0) {
+                    bgColor = 'rgba(251,191,36,' + (0.45 * alpha + 0.15) + ')';
+                } else if (climb < 2.5) {
+                    bgColor = 'rgba(251,146,60,' + (0.45 * alpha + 0.15) + ')';
+                } else {
+                    bgColor = 'rgba(248,113,113,' + (0.50 * alpha + 0.18) + ')';
+                }
 
                 chartG.append('rect')
                     .attr('x', ci * CELL_W).attr('y', rowY(ri))
@@ -263,7 +271,7 @@ window.Meteogram = (function () {
                 g.append('path')
                     .attr('d', arrowPath(speed))
                     .attr('fill', color)
-                    .attr('transform', 'rotate(' + d.wind_direction + ')');
+                    .attr('transform', 'rotate(' + ((d.wind_direction + 180) % 360) + ')');
 
                 chartG.append('text').attr('class', 'wind-value')
                     .attr('x', cx).attr('y', rowY(ri3) + CELL_H - 4)
@@ -339,7 +347,7 @@ window.Meteogram = (function () {
                 gArrow.append('path')
                     .attr('d', arrowPath(spd * 0.7))
                     .attr('fill', wColor)
-                    .attr('transform', 'rotate(' + (dir || 0) + ') scale(0.65)');
+                    .attr('transform', 'rotate(' + (((dir || 0) + 180) % 360) + ') scale(0.65)');
                 chartG.append('text').attr('class', 'ground-value')
                     .attr('x', cx + 8).attr('y', groundY + 14)
                     .attr('dominant-baseline', 'central').attr('fill', wColor)
@@ -373,13 +381,13 @@ window.Meteogram = (function () {
                     .attr('fill', precipColor(precipAmt));
             }
 
-            // Row 3: Thermik Proxy
+            // Row 3: Thermik (Steigrate m/s)
             var therm = wx.thermik || {};
             if (therm.climb_rate > 0) {
                 var tColor = '#9CA3AF';
-                if (therm.rating >= 8) tColor = '#DC2626';
-                else if (therm.rating >= 5) tColor = '#EA580C';
-                else if (therm.rating >= 3) tColor = '#D97706';
+                if (therm.climb_rate >= 2.5) tColor = '#DC2626';
+                else if (therm.climb_rate >= 1.5) tColor = '#EA580C';
+                else if (therm.climb_rate >= 0.8) tColor = '#D97706';
                 else if (therm.climb_rate > 0) tColor = '#10B981';
 
                 chartG.append('text').attr('class', 'ground-value')
@@ -387,11 +395,6 @@ window.Meteogram = (function () {
                     .attr('dominant-baseline', 'central').attr('font-size', '11px')
                     .attr('font-weight', 'bold').attr('fill', tColor)
                     .text(therm.climb_rate.toFixed(1));
-            } else if (therm.cape > 100) {
-                chartG.append('text').attr('class', 'ground-value')
-                    .attr('x', cx).attr('y', groundY + 72 + 14)
-                    .attr('dominant-baseline', 'central').attr('font-size', '10px')
-                    .attr('fill', '#9CA3AF').text('cape');
             }
         });
 
@@ -437,11 +440,11 @@ window.Meteogram = (function () {
                 }
                 if (wx.thermik) {
                     if (wx.thermik.climb_rate > 0) {
-                        html += '<div class="tooltip-row" style="margin-top:6px;padding-top:6px;border-top:1px solid #E5E7EB"><span class="tooltip-label">Thermik (Proxy)</span><span class="tooltip-value">' + wx.thermik.climb_rate.toFixed(1) + ' m/s</span></div>';
-                        html += '<div class="tooltip-row"><span class="tooltip-label">Max. Hoehe</span><span class="tooltip-value">' + wx.thermik.max_height + ' m</span></div>';
-                        html += '<div class="tooltip-row"><span class="tooltip-label">Guete (0-10)</span><span class="tooltip-value">' + wx.thermik.rating + '</span></div>';
+                        html += '<div class="tooltip-row" style="margin-top:6px;padding-top:6px;border-top:1px solid #E5E7EB"><span class="tooltip-label">Steigrate</span><span class="tooltip-value">' + wx.thermik.climb_rate.toFixed(1) + ' m/s</span></div>';
+                        html += '<div class="tooltip-row"><span class="tooltip-label">Arbeitsh\u00f6he</span><span class="tooltip-value">' + wx.thermik.max_height + ' m MSL</span></div>';
+                        html += '<div class="tooltip-row"><span class="tooltip-label">Rating</span><span class="tooltip-value">' + wx.thermik.rating + '/10</span></div>';
                     }
-                    html += '<div class="tooltip-row"><span class="tooltip-label">CAPE</span><span class="tooltip-value">' + Math.round(wx.thermik.cape) + ' J/kg</span></div>';
+                    if (wx.thermik.cape > 0) html += '<div class="tooltip-row"><span class="tooltip-label">CAPE</span><span class="tooltip-value">' + Math.round(wx.thermik.cape) + ' J/kg</span></div>';
                 }
                 if (wx.cloudbase && wx.cloudbase.height != null) {
                     html += '<div class="tooltip-row"><span class="tooltip-label">Wolkenbasis</span><span class="tooltip-value">' + Math.round(wx.cloudbase.height) + 'm</span></div>';

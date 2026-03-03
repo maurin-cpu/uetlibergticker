@@ -34,18 +34,22 @@ def get_temperature_forecast_for_location(location_name, latitude, longitude):
     }
 
     try:
-        # Abrufen beider Modelle
-        print(f"[INFO] Rufe ICON-CH1 Daten ab für {location_name}...")
-        resp_ch1 = requests.get(config.API_URL, params=params_ch1, timeout=config.API_TIMEOUT)
-        resp_ch1.raise_for_status()
-        data_ch1 = resp_ch1.json()
+        # Abrufen beider Modelle (CH1 ist optional, Seamless ist Pflicht)
+        data_ch1 = None
+        try:
+            print(f"[INFO] Rufe ICON-CH1 Daten ab fuer {location_name}...")
+            resp_ch1 = requests.get(config.API_URL, params=params_ch1, timeout=config.API_TIMEOUT)
+            resp_ch1.raise_for_status()
+            data_ch1 = resp_ch1.json()
+        except requests.exceptions.RequestException as e:
+            print(f"[WARNUNG] ICON-CH1 fehlgeschlagen (weiter mit Seamless): {e}")
 
-        print(f"[INFO] Rufe Seamless Fallback Daten ab für {location_name}...")
+        print(f"[INFO] Rufe Seamless Fallback Daten ab fuer {location_name}...")
         resp_sl = requests.get(config.API_URL, params=params_seamless, timeout=config.API_TIMEOUT)
         resp_sl.raise_for_status()
         data_sl = resp_sl.json()
 
-        hourly_ch1 = data_ch1.get("hourly", {})
+        hourly_ch1 = data_ch1.get("hourly", {}) if data_ch1 else {}
         hourly_sl = data_sl.get("hourly", {})
 
         times_sl = hourly_sl.get("time", [])
@@ -71,8 +75,8 @@ def get_temperature_forecast_for_location(location_name, latitude, longitude):
                 pl_entry[param] = val
             pressure_level_data[time_str] = pl_entry
 
-        # Überschreibe/Ergänze mit ICON-CH1 (wo verfügbar und nicht null)
-        times_ch1 = hourly_ch1.get("time", [])
+        # Ueberschreibe/Ergaenze mit ICON-CH1 (wo verfuegbar und nicht null)
+        times_ch1 = hourly_ch1.get("time", []) if hourly_ch1 else []
         for i, time_str in enumerate(times_ch1):
             if time_str not in hourly_data:
                 continue
@@ -94,6 +98,34 @@ def get_temperature_forecast_for_location(location_name, latitude, longitude):
             cb = hourly_data[time_str].get('cloud_base')
             if cb is not None and cb > 6000:
                 hourly_data[time_str]['cloud_base'] = None
+
+        # 3. GFS-Supplementary (BLH, LI, CIN – bei icon_seamless oft null)
+        try:
+            print(f"[INFO] Rufe GFS-Supplement ab fuer {location_name} (BLH, LI, CIN)...")
+            params_gfs = {
+                "latitude": latitude,
+                "longitude": longitude,
+                "hourly": ",".join(config.GFS_SUPPLEMENTARY_PARAMS),
+                "models": "gfs_seamless",
+                "forecast_days": config.FORECAST_DAYS,
+                "timezone": config.TIMEZONE,
+            }
+            resp_gfs = requests.get(config.API_URL, params=params_gfs, timeout=10)
+            resp_gfs.raise_for_status()
+            hourly_gfs = resp_gfs.json().get("hourly", {})
+            gfs_times = hourly_gfs.get("time", [])
+            filled = 0
+            for i, ts in enumerate(gfs_times):
+                if ts in hourly_data:
+                    for p in config.GFS_SUPPLEMENTARY_PARAMS:
+                        if hourly_data[ts].get(p) is None:
+                            val = hourly_gfs.get(p, [None])[i] if i < len(hourly_gfs.get(p, [])) else None
+                            if val is not None:
+                                hourly_data[ts][p] = val
+                                filled += 1
+            print(f"[INFO] GFS-Supplement: {filled} Null-Werte aufgefuellt")
+        except Exception as e:
+            print(f"[WARNUNG] GFS-Supplement fehlgeschlagen (weiter ohne): {e}")
 
         print(f"[INFO] Hybrid-Merge abgeschlossen: {len(hourly_data)} Zeitstempel für {location_name}")
         return hourly_data, pressure_level_data

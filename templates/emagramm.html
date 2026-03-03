@@ -4,10 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gleitschirm Emagramm & Rohdaten</title>
-    <!-- Tailwind CSS for styling -->
+    <title>Gleitschirm Emagramm – Uetliberg</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Plotly.js for plotting -->
     <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
     <style>
         body {
@@ -32,6 +30,43 @@
                 transform: rotate(360deg);
             }
         }
+
+        .hour-btn {
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.85rem;
+            cursor: pointer;
+            border: 2px solid #e5e7eb;
+            background: white;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .hour-btn:hover {
+            border-color: #6366f1;
+            background: #eef2ff;
+        }
+
+        .hour-btn.active {
+            border-color: #4f46e5;
+            background: #4f46e5;
+            color: white;
+        }
+
+        .hour-btn .climb-dot {
+            display: block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin: 4px auto 0;
+        }
+
+        .thermal-bar {
+            border-radius: 4px;
+            transition: height 0.3s;
+            min-height: 2px;
+        }
     </style>
 </head>
 
@@ -39,7 +74,7 @@
     <!-- Navbar -->
     <nav class="bg-indigo-600 text-white shadow-lg p-4">
         <div class="container mx-auto flex justify-between items-center">
-            <h1 class="text-2xl font-bold">🪂 Gleitschirm Emagramm</h1>
+            <h1 class="text-2xl font-bold">🪂 Emagramm – Uetliberg</h1>
             <div class="flex gap-4">
                 <a href="/meteo" class="text-indigo-200 hover:text-white transition">Meteogramm</a>
                 <a href="/regions" class="text-indigo-200 hover:text-white transition">Landkarte</a>
@@ -49,7 +84,6 @@
         </div>
     </nav>
 
-    <!-- Main Content -->
     <main class="container mx-auto p-4 mt-6">
 
         <div id="loading" class="flex flex-col items-center justify-center py-20">
@@ -63,48 +97,98 @@
             <span class="block sm:inline" id="error-text"></span>
         </div>
 
-        <!-- 2 Column Layout -->
-        <div id="content" class="hidden flex flex-col md:flex-row gap-6">
+        <div id="content" class="hidden">
 
-            <!-- Left Column: Plotly Emagramm -->
-            <div class="w-full md:w-2/3 bg-white p-4 rounded-xl shadow-md border border-gray-200">
-                <h2 class="text-xl font-bold text-gray-800 mb-2 border-b pb-2">Emagramm</h2>
-                <p class="text-sm text-gray-500 mb-4">Letzte Aktualisierung: <span id="timestamp"
-                        class="font-medium">-</span></p>
-                <div id="emagramm-plot" class="w-full h-[600px] border border-gray-300 rounded bg-gray-50"></div>
+            <!-- Stunden-Selektor -->
+            <div class="bg-white p-4 rounded-xl shadow-md border border-gray-200 mb-6">
+                <div class="flex flex-wrap items-center gap-2">
+                    <span class="text-sm font-semibold text-gray-600 mr-2">Stunde:</span>
+                    <div id="hour-buttons" class="flex flex-wrap gap-2"></div>
+                </div>
             </div>
 
-            <!-- Right Column: Raw Data Table -->
-            <div class="w-full md:w-1/3 bg-white p-4 rounded-xl shadow-md border border-gray-200 flex flex-col">
-                <h2 class="text-xl font-bold text-gray-800 mb-2 border-b pb-2">Rohdaten</h2>
-                <div class="overflow-x-auto flex-grow">
-                    <table class="min-w-full text-sm text-left text-gray-600">
-                        <thead class="text-xs text-gray-700 uppercase bg-gray-100 border-b border-gray-300">
-                            <tr>
-                                <th scope="col" class="px-3 py-3 font-semibold">Druck (hPa)</th>
-                                <th scope="col" class="px-3 py-3 font-semibold">Temp (°C)</th>
-                                <th scope="col" class="px-3 py-3 font-semibold">Taupunkt (°C)</th>
-                                <th scope="col" class="px-3 py-3 font-semibold">RF (%)</th>
-                            </tr>
-                        </thead>
-                        <tbody id="data-table-body" class="divide-y divide-gray-200">
-                            <!-- Rows inserted via JS -->
-                        </tbody>
-                    </table>
+            <!-- Thermik-Info-Box -->
+            <div id="thermal-info" class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+                <div class="bg-white p-4 rounded-xl shadow-md border border-gray-200 text-center">
+                    <div class="text-xs text-gray-500 uppercase font-semibold">Steigrate</div>
+                    <div id="info-climb" class="text-2xl font-bold text-indigo-600">–</div>
+                    <div class="text-xs text-gray-400">m/s</div>
+                </div>
+                <div class="bg-white p-4 rounded-xl shadow-md border border-gray-200 text-center">
+                    <div class="text-xs text-gray-500 uppercase font-semibold">Rating</div>
+                    <div id="info-rating" class="text-2xl font-bold text-indigo-600">–</div>
+                    <div class="text-xs text-gray-400">/ 10</div>
+                </div>
+                <div class="bg-white p-4 rounded-xl shadow-md border border-gray-200 text-center">
+                    <div class="text-xs text-gray-500 uppercase font-semibold">Arbeitshöhe</div>
+                    <div id="info-height" class="text-2xl font-bold text-indigo-600">–</div>
+                    <div class="text-xs text-gray-400">m MSL</div>
+                </div>
+                <div class="bg-white p-4 rounded-xl shadow-md border border-gray-200 text-center">
+                    <div class="text-xs text-gray-500 uppercase font-semibold">Wolkenbasis</div>
+                    <div id="info-lcl" class="text-2xl font-bold text-indigo-600">–</div>
+                    <div class="text-xs text-gray-400">m MSL</div>
+                </div>
+                <div class="bg-white p-4 rounded-xl shadow-md border border-gray-200 text-center">
+                    <div class="text-xs text-gray-500 uppercase font-semibold">Standort</div>
+                    <div id="info-location" class="text-lg font-bold text-gray-700">–</div>
+                    <div id="info-timestamp" class="text-xs text-gray-400">–</div>
+                </div>
+            </div>
+
+            <!-- Thermik-Verlauf (Barplot) -->
+            <div class="bg-white p-4 rounded-xl shadow-md border border-gray-200 mb-6">
+                <h2 class="text-sm font-bold text-gray-700 mb-3">Thermik-Verlauf (Steigrate m/s)</h2>
+                <div id="thermal-bars" class="flex items-end gap-1 h-24"></div>
+            </div>
+
+            <!-- 2 Column Layout -->
+            <div class="flex flex-col md:flex-row gap-6">
+                <!-- Left Column: Emagramm -->
+                <div class="w-full md:w-2/3 bg-white p-4 rounded-xl shadow-md border border-gray-200">
+                    <h2 class="text-xl font-bold text-gray-800 mb-2 border-b pb-2">Emagramm</h2>
+                    <div id="emagramm-plot" class="w-full h-[600px] border border-gray-300 rounded bg-gray-50"></div>
+                </div>
+
+                <!-- Right Column: Raw Data + Diagnostik -->
+                <div class="w-full md:w-1/3 flex flex-col gap-6">
+                    <div class="bg-white p-4 rounded-xl shadow-md border border-gray-200">
+                        <h2 class="text-lg font-bold text-gray-800 mb-2 border-b pb-2">Rohdaten</h2>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full text-sm text-left text-gray-600">
+                                <thead class="text-xs text-gray-700 uppercase bg-gray-100 border-b border-gray-300">
+                                    <tr>
+                                        <th class="px-3 py-2 font-semibold">hPa</th>
+                                        <th class="px-3 py-2 font-semibold">T °C</th>
+                                        <th class="px-3 py-2 font-semibold">Td °C</th>
+                                        <th class="px-3 py-2 font-semibold">RF %</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="data-table-body" class="divide-y divide-gray-200"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="bg-white p-4 rounded-xl shadow-md border border-gray-200">
+                        <h2 class="text-lg font-bold text-gray-800 mb-2 border-b pb-2">Diagnostik</h2>
+                        <div id="diagnostics" class="text-xs text-gray-600 space-y-1 font-mono"></div>
+                    </div>
                 </div>
             </div>
         </div>
     </main>
 
     <script>
+        let currentData = null;
+
         document.addEventListener('DOMContentLoaded', () => {
             fetchEmagrammData();
         });
 
-        async function fetchEmagrammData() {
+        async function fetchEmagrammData(hour = null) {
             try {
                 showLoading(true);
-                const response = await fetch('/api/emagramm-data');
+                const url = hour !== null ? `/api/emagramm-data?hour=${hour}` : '/api/emagramm-data';
+                const response = await fetch(url);
                 const data = await response.json();
 
                 if (!response.ok) {
@@ -112,9 +196,13 @@
                 }
 
                 if (data.success) {
+                    currentData = data;
+                    renderHourButtons(data.hourly_thermal, data.selected_hour);
+                    renderThermalInfo(data.thermal, data.location, data.timestamp);
+                    renderThermalBars(data.hourly_thermal, data.selected_hour);
                     renderTable(data.data);
                     renderEmagramm(data.data, data.thermal);
-                    document.getElementById('timestamp').textContent = data.timestamp;
+                    renderDiagnostics(data.thermal);
                     showLoading(false);
                 } else {
                     throw new Error(data.error || "Unbekannter Fehler beim Laden");
@@ -123,6 +211,98 @@
                 console.error('Fetch error:', error);
                 showError(error.message);
             }
+        }
+
+        function ratingColor(rating) {
+            if (rating >= 8) return '#10b981'; // green
+            if (rating >= 6) return '#84cc16'; // lime
+            if (rating >= 4) return '#f59e0b'; // amber
+            if (rating >= 2) return '#f97316'; // orange
+            return '#ef4444'; // red
+        }
+
+        function climbColor(climb) {
+            if (climb >= 2.5) return '#dc2626';
+            if (climb >= 1.5) return '#f97316';
+            if (climb >= 0.8) return '#f59e0b';
+            if (climb >= 0.3) return '#84cc16';
+            return '#d1d5db';
+        }
+
+        function renderHourButtons(hourlyThermal, selectedHour) {
+            const container = document.getElementById('hour-buttons');
+            container.innerHTML = '';
+
+            // Group by date
+            const byDate = {};
+            hourlyThermal.forEach(ht => {
+                if (!byDate[ht.date]) byDate[ht.date] = [];
+                byDate[ht.date].push(ht);
+            });
+
+            Object.entries(byDate).forEach(([date, hours], dateIdx) => {
+                if (dateIdx > 0) {
+                    const sep = document.createElement('span');
+                    sep.className = 'text-gray-300 mx-1';
+                    sep.textContent = '|';
+                    container.appendChild(sep);
+                }
+                // Date label
+                const dateLabel = document.createElement('span');
+                const d = new Date(date);
+                dateLabel.className = 'text-xs text-gray-400 font-medium self-center mr-1';
+                dateLabel.textContent = d.toLocaleDateString('de-CH', { weekday: 'short', day: 'numeric' });
+                container.appendChild(dateLabel);
+
+                hours.forEach(ht => {
+                    const btn = document.createElement('button');
+                    btn.className = 'hour-btn' + (ht.hour === selectedHour && dateIdx === 0 ? ' active' : '');
+                    btn.innerHTML = `${ht.hour}:00<span class="climb-dot" style="background:${climbColor(ht.climb_rate)}"></span>`;
+                    btn.onclick = () => fetchEmagrammData(ht.hour);
+                    container.appendChild(btn);
+                });
+            });
+        }
+
+        function renderThermalInfo(thermal, location, timestamp) {
+            document.getElementById('info-climb').textContent =
+                thermal.climb_rate !== undefined ? thermal.climb_rate.toFixed(1) : '–';
+            document.getElementById('info-rating').textContent =
+                thermal.rating !== undefined ? thermal.rating : '–';
+            document.getElementById('info-height').textContent =
+                thermal.max_height !== undefined ? thermal.max_height : '–';
+            document.getElementById('info-lcl').textContent =
+                thermal.lcl ? thermal.lcl : 'wolkenfrei';
+            document.getElementById('info-location').textContent =
+                location ? location.name : '–';
+            document.getElementById('info-timestamp').textContent =
+                timestamp ? timestamp.replace('T', ' ') : '–';
+        }
+
+        function renderThermalBars(hourlyThermal, selectedHour) {
+            const container = document.getElementById('thermal-bars');
+            container.innerHTML = '';
+
+            const maxClimb = Math.max(3.0, ...hourlyThermal.map(h => h.climb_rate));
+
+            hourlyThermal.forEach(ht => {
+                const barHeight = Math.max(2, (ht.climb_rate / maxClimb) * 80);
+                const wrapper = document.createElement('div');
+                wrapper.className = 'flex flex-col items-center flex-1 cursor-pointer';
+                wrapper.onclick = () => fetchEmagrammData(ht.hour);
+
+                const isSelected = ht.hour === selectedHour;
+                const barColor = climbColor(ht.climb_rate);
+
+                wrapper.innerHTML = `
+                    <div class="text-xs font-bold mb-1" style="color:${barColor}">${ht.climb_rate.toFixed(1)}</div>
+                    <div class="thermal-bar w-full ${isSelected ? 'ring-2 ring-indigo-500' : ''}" 
+                         style="height:${barHeight}px; background:${barColor}"></div>
+                    <div class="text-xs text-gray-500 mt-1 ${isSelected ? 'font-bold text-indigo-600' : ''}">${ht.hour}h</div>
+                    <div class="text-xs font-semibold" style="color:${ratingColor(ht.rating)}">${ht.rating}/10</div>
+                `;
+                container.appendChild(wrapper);
+            });
         }
 
         function showLoading(isLoading) {
@@ -142,11 +322,9 @@
         function renderTable(data) {
             const tbody = document.getElementById('data-table-body');
             tbody.innerHTML = '';
-
             data.forEach((row, index) => {
                 const tr = document.createElement('tr');
                 tr.className = index % 2 === 0 ? 'bg-white hover:bg-gray-50' : 'bg-gray-50 hover:bg-gray-100';
-
                 tr.innerHTML = `
                     <td class="px-3 py-2 font-medium text-gray-900">${row.pressure}</td>
                     <td class="px-3 py-2 text-red-600 font-semibold">${row.temperature.toFixed(1)}</td>
@@ -157,72 +335,113 @@
             });
         }
 
+        function renderDiagnostics(thermal) {
+            const container = document.getElementById('diagnostics');
+            container.innerHTML = '';
+
+            if (thermal.diagnostics) {
+                const diag = thermal.diagnostics;
+                const items = [
+                    ['W* Parcel', diag.w_star_parcel],
+                    ['W* Deardorff', diag.w_star_deardorff],
+                    ['Limitierung', diag.limiting_factor],
+                    ['H (W/m²)', diag.sensible_heat_flux],
+                    ['H geschätzt', diag.sensible_heat_flux_estimated ? 'Ja' : 'Nein'],
+                    ['LE (W/m²)', diag.latent_heat_flux],
+                    ['Bowen-Ratio', diag.bowen_ratio],
+                    ['Thermik-Tiefe', `${diag.thermal_depth_m}m`],
+                    ['BLH (AGL)', diag.boundary_layer_height_agl != null ? `${diag.boundary_layer_height_agl}m` : '–'],
+                    ['Bodenfeuchte', diag.soil_moisture != null ? diag.soil_moisture.toFixed(3) : '–'],
+                    ['Lifted Index', diag.lifted_index != null ? diag.lifted_index.toFixed(1) : '–'],
+                    ['CIN (J/kg)', diag.convective_inhibition != null ? diag.convective_inhibition : '–'],
+                    ['VPD (kPa)', diag.vapour_pressure_deficit != null ? diag.vapour_pressure_deficit : '–'],
+                ];
+                items.forEach(([label, val]) => {
+                    const div = document.createElement('div');
+                    div.className = 'flex justify-between';
+                    div.innerHTML = `<span class="text-gray-500">${label}:</span><span class="text-gray-800 font-semibold">${val ?? '–'}</span>`;
+                    container.appendChild(div);
+                });
+            }
+
+            if (thermal.data_warnings && thermal.data_warnings.length > 0) {
+                const warnDiv = document.createElement('div');
+                warnDiv.className = 'mt-3 pt-2 border-t border-gray-200';
+                warnDiv.innerHTML = '<div class="text-xs font-bold text-amber-600 mb-1">Hinweise:</div>';
+                thermal.data_warnings.forEach(w => {
+                    const p = document.createElement('p');
+                    p.className = 'text-xs text-amber-700 mb-0.5';
+                    p.textContent = '• ' + w;
+                    warnDiv.appendChild(p);
+                });
+                container.appendChild(warnDiv);
+            }
+        }
+
         function renderEmagramm(dataArray, thermalData) {
-            // Emagramm is traditionally plotted with Pressure decreasing on Y-axis (log scale)
-            // X-axis is Temperature (linear), vertical lines are isotherms
-
-            // wir drehen das Array NICHT zwingend, aber Plotly zeichnet von links nach rechts/unten nach oben
-            // Y-Achse als "reversed" reicht.
-
             const pressures = dataArray.map(d => d.pressure);
             const temps = dataArray.map(d => d.temperature);
             const dewpoints = dataArray.map(d => d.dewpoint);
 
             const traceTemp = {
-                x: temps,
-                y: pressures,
+                x: temps, y: pressures,
                 mode: 'lines+markers',
                 name: 'Temperatur (°C)',
-                line: { color: '#ef4444', width: 3 }, // Red
+                line: { color: '#ef4444', width: 3 },
                 marker: { size: 6, color: '#dc2626' }
             };
-
             const traceDew = {
-                x: dewpoints,
-                y: pressures,
+                x: dewpoints, y: pressures,
                 mode: 'lines+markers',
                 name: 'Taupunkt (°C)',
-                line: { color: '#3b82f6', width: 3, dash: 'solid' }, // Blue
+                line: { color: '#3b82f6', width: 3, dash: 'solid' },
                 marker: { size: 6, color: '#2563eb' }
             };
 
             const plotData = [traceDew, traceTemp];
 
-            // Thermik-Kurve plotten
+            // Thermik-Kurven
             if (thermalData && !thermalData.error) {
                 if (thermalData.dry_adiabat) {
-                    const dryP = thermalData.dry_adiabat.map(d => d.p);
-                    const dryT = thermalData.dry_adiabat.map(d => d.t);
                     plotData.push({
-                        x: dryT,
-                        y: dryP,
+                        x: thermalData.dry_adiabat.map(d => d.t),
+                        y: thermalData.dry_adiabat.map(d => d.p),
                         mode: 'lines',
                         name: 'Trockenadiabate',
                         line: { color: '#f59e0b', width: 2, dash: 'dash' }
                     });
                 }
-
                 if (thermalData.sat_adiabat) {
-                    const satP = thermalData.sat_adiabat.map(d => d.p);
-                    const satT = thermalData.sat_adiabat.map(d => d.t);
                     plotData.push({
-                        x: satT,
-                        y: satP,
+                        x: thermalData.sat_adiabat.map(d => d.t),
+                        y: thermalData.sat_adiabat.map(d => d.p),
                         mode: 'lines',
                         name: 'Feuchtadiabate',
                         line: { color: '#10b981', width: 2, dash: 'dashdot' }
                     });
                 }
-
-                // LCL and Max Height marker
-                if (thermalData.lcl) {
+                if (thermalData.lcl_pressure) {
                     plotData.push({
                         y: [thermalData.lcl_pressure, thermalData.lcl_pressure],
                         x: [-30, 30],
                         mode: 'lines',
-                        name: 'Wolkenbasis (LCL)',
-                        line: { color: '#6b7280', width: 1, dash: 'dot' }
+                        name: `Wolkenbasis (LCL ${thermalData.lcl || ''}m)`,
+                        line: { color: '#6b7280', width: 1.5, dash: 'dot' }
                     });
+                }
+                // Thermik-Obergrenze markieren
+                if (thermalData.max_height) {
+                    // Approximate pressure from height using barometric formula
+                    const maxP = 1013.25 * Math.pow(1 - thermalData.max_height * 0.0000225577, 5.25588);
+                    if (maxP > 500 && maxP < 1000) {
+                        plotData.push({
+                            y: [maxP, maxP],
+                            x: [-30, 30],
+                            mode: 'lines',
+                            name: `Thermik-Obergrenze (${thermalData.max_height}m)`,
+                            line: { color: '#f97316', width: 1.5, dash: 'dash' }
+                        });
+                    }
                 }
             }
 
@@ -238,21 +457,16 @@
                 },
                 yaxis: {
                     title: 'Luftdruck (hPa)',
-                    autorange: 'reversed', // Higher pressure at bottom
-                    type: 'log',           // Logarithmic scale for classical Emagramm
-                    range: [Math.log10(1000), Math.log10(500)], // Needs log bounds correctly, but autorange reversed handles usually well
-                    // To enforce explicit range on log axis in plotly:
-                    // range: [Math.log10(1000), Math.log10(500)]
-                    // However, autorange reversed + explicit log range needs manual bounds:
+                    autorange: 'reversed',
+                    type: 'log',
                     range: [Math.log10(1000), Math.log10(500)],
                     tickvals: [1000, 950, 900, 850, 800, 700, 600, 500],
                     ticktext: ['1000', '950', '900', '850', '800', '700', '600', '500'],
                     gridcolor: '#e5e7eb'
                 },
                 legend: {
-                    x: 0,
-                    y: 1,
-                    bgcolor: 'rgba(255, 255, 255, 0.8)',
+                    x: 0, y: 1,
+                    bgcolor: 'rgba(255,255,255,0.8)',
                     bordercolor: '#d1d5db',
                     borderwidth: 1
                 },
@@ -260,18 +474,6 @@
                 paper_bgcolor: 'rgba(0,0,0,0)',
                 plot_bgcolor: 'rgba(0,0,0,0)'
             };
-
-            // Workaround for Plotly log axis reversed explicit bounds
-            layout.yaxis.range = [Math.log10(1000), Math.log10(500)]; // 3 to ~2.69
-
-            // Background Dry Adiabats - Approximations for visual cue
-            const shapes = [];
-            // Isothermen (vertical lines) are handled by gridlines, but we want dry adiabats
-            // For a true emagramm, we just add some slanted lines manually if desired, but 
-            // since Plotly doesn't natively support SkewT/Emagram, exact adiabats require calculating curves!
-
-            // For now, we plot a clean classical T-log(P) chart (Emagramm) which is
-            // linear T on X, log P on Y. Dry adiabats are curves in this space.
 
             Plotly.newPlot('emagramm-plot', plotData, layout, { responsive: true, displayModeBar: false });
         }

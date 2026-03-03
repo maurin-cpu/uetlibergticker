@@ -15,6 +15,8 @@ LOCATION = {
     "typ": "Startplatz",
     "fluggebiet": "Uetliberg",
     "windrichtung": "N-O",
+    "slope_azimuth": 225,  # SW-Ausrichtung des Hangkamms (für generelle Sonneneinstrahlung)
+    "slope_angle": 30,     # ca. 30 Grad Hangneigung
     "bemerkung": "Benötigt gewisse Windstärke da man hier Soaren muss, ab 15km/h kann man Erfahrungsgemäss am Uetliberg gut fliegen ab 20km/h hat man sehr gute windstärke, wenn dann Thermikbedingungen gut sind hat man gute bedingungen, der Wind ist grundsätzlich aber ab 30km/h zu stark, dies sind jedoch keine Grenzwerte sondern müssen immer beurteilt werden"
 }
 
@@ -103,8 +105,24 @@ HOURLY_PARAMS = [
     "boundary_layer_height",
     "surface_pressure",
     "shortwave_radiation",
-    "surface_sensible_heat_flux",
-    "surface_latent_heat_flux",
+    "direct_radiation",
+    "diffuse_radiation",
+    "soil_moisture_0_to_1cm",
+    "soil_temperature_0cm",
+    "updraft",
+    "et0_fao_evapotranspiration",
+    "vapour_pressure_deficit",
+    "snow_depth",
+    # surface_sensible_heat_flux und surface_latent_heat_flux sind bei
+    # icon_seamless und meteoswiss_icon_ch1 nicht verfuegbar (400 Error).
+    # thermik_calculator hat Fallback: H = shortwave_radiation * 0.3 * sun_factor
+]
+
+# Parameter die via GFS-Supplementary-Call geholt werden (bei icon_seamless oft null)
+GFS_SUPPLEMENTARY_PARAMS = [
+    "boundary_layer_height",
+    "lifted_index",
+    "convective_inhibition",
 ]
 
 

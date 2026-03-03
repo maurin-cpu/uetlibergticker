@@ -1,0 +1,1328 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Dokumentation für den Uetliberg Ticker, eine Meteo- und Thermik-Plattform für Gleitschirmpiloten in der Schweiz.">
+      
+      
+      
+      
+        <link rel="prev" href="../">
+      
+      
+        <link rel="next" href="../foehn_bise/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.3">
+    
+    
+      
+        <title>Thermik-Berechnung - Uetliberg Ticker</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#thermik-berechnung-im-uetliberg-ticker" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Uetliberg Ticker" class="md-header__button md-logo" aria-label="Uetliberg Ticker" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Uetliberg Ticker
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Thermik-Berechnung
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Uetliberg Ticker" class="md-nav__button md-logo" aria-label="Uetliberg Ticker" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Uetliberg Ticker
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Startseite
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architektur
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Meteorologie
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Meteorologie
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Übersicht
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Thermik-Berechnung
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Thermik-Berechnung
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#uberblick" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Überblick
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-eingangsdaten" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Eingangsdaten
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-taupunkt-berechnung" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Taupunkt-Berechnung
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-auslosetemperatur-trigger-temperature" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Auslösetemperatur (Trigger Temperature)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-lcl-wolkenbasis-lifting-condensation-level" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. LCL – Wolkenbasis (Lifting Condensation Level)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-paketaufstieg-thermal-index-profil" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Paketaufstieg – Thermal Index Profil
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Paketaufstieg – Thermal Index Profil">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#trockenadiabatischer-aufstieg-unter-lcl" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Trockenadiabatischer Aufstieg (unter LCL)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#feuchtadiabatischer-aufstieg-uber-lcl" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Feuchtadiabatischer Aufstieg (über LCL)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#thermal-index-ti" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Thermal Index (TI)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#aufstiegs-abbruch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Aufstiegs-Abbruch
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-grenzschicht-begrenzung" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Grenzschicht-Begrenzung
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-steigrate-w-convective-velocity-scale" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Steigrate w* (Convective Velocity Scale)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. Steigrate w* (Convective Velocity Scale)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#kalibrierung-auf-gleitschirm-variowerte" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Kalibrierung auf Gleitschirm-Variowerte
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mindesthohe" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mindesthöhe
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-gute-rating-010" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Güte-Rating (0–10)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-tages-aggregation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Tages-Aggregation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-datenfluss-architektur" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. Datenfluss-Architektur
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#physikalische-konstanten" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Physikalische Konstanten
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quellen-und-referenzen" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quellen und Referenzen
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../foehn_bise/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Föhn & Bise
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#uberblick" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Überblick
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-eingangsdaten" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Eingangsdaten
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-taupunkt-berechnung" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Taupunkt-Berechnung
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-auslosetemperatur-trigger-temperature" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Auslösetemperatur (Trigger Temperature)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-lcl-wolkenbasis-lifting-condensation-level" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. LCL – Wolkenbasis (Lifting Condensation Level)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-paketaufstieg-thermal-index-profil" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Paketaufstieg – Thermal Index Profil
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Paketaufstieg – Thermal Index Profil">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#trockenadiabatischer-aufstieg-unter-lcl" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Trockenadiabatischer Aufstieg (unter LCL)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#feuchtadiabatischer-aufstieg-uber-lcl" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Feuchtadiabatischer Aufstieg (über LCL)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#thermal-index-ti" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Thermal Index (TI)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#aufstiegs-abbruch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Aufstiegs-Abbruch
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-grenzschicht-begrenzung" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Grenzschicht-Begrenzung
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-steigrate-w-convective-velocity-scale" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Steigrate w* (Convective Velocity Scale)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. Steigrate w* (Convective Velocity Scale)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#kalibrierung-auf-gleitschirm-variowerte" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Kalibrierung auf Gleitschirm-Variowerte
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mindesthohe" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mindesthöhe
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-gute-rating-010" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Güte-Rating (0–10)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-tages-aggregation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Tages-Aggregation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-datenfluss-architektur" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. Datenfluss-Architektur
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#physikalische-konstanten" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Physikalische Konstanten
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quellen-und-referenzen" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quellen und Referenzen
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="thermik-berechnung-im-uetliberg-ticker">Thermik-Berechnung im Uetliberg Ticker<a class="headerlink" href="#thermik-berechnung-im-uetliberg-ticker" title="Permanent link">&para;</a></h1>
+<h2 id="uberblick">Überblick<a class="headerlink" href="#uberblick" title="Permanent link">&para;</a></h2>
+<p>Der Uetliberg Ticker berechnet für 24 Schweizer Thermikregionen ein stündliches <strong>Thermik-Güte-Rating</strong> (0–10). Die Berechnung simuliert physikalisch den Aufstieg eines Luftpakets vom Boden durch die Atmosphäre und leitet daraus erwartetes Steigen (m/s) und nutzbare Arbeitshöhe ab.</p>
+<div class="highlight"><pre><span></span><code>Wetterdaten (Open-Meteo API)
+        │
+        ▼
+┌─────────────────────────┐
+│  Bodentemperatur + Sonne │──▶ Auslösetemperatur
+│  Taupunkt                │──▶ LCL (Wolkenbasis)
+│  Höhenprofile (hPa)      │──▶ Paketaufstieg
+│  Grenzschichthöhe        │──▶ Höhenbegrenzung
+└─────────────────────────┘
+        │
+        ▼
+┌─────────────────────────┐
+│  Thermal Index Profil    │
+│  w* Steigrate            │
+│  Güte-Rating (0-10)      │
+└─────────────────────────┘
+</code></pre></div>
+<hr />
+<h2 id="1-eingangsdaten">1. Eingangsdaten<a class="headerlink" href="#1-eingangsdaten" title="Permanent link">&para;</a></h2>
+<p>Pro Region und Stunde werden folgende Werte von der <strong>Open-Meteo API</strong> (Modell: <code>icon_seamless</code>) bezogen:</p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Beschreibung</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>temperature_2m</code></td>
+<td>Bodentemperatur in 2m Höhe (°C)</td>
+</tr>
+<tr>
+<td><code>dewpoint_2m</code> / <code>relative_humidity_2m</code></td>
+<td>Taupunkt oder relative Feuchte am Boden</td>
+</tr>
+<tr>
+<td><code>boundary_layer_height</code></td>
+<td>Grenzschichthöhe über Grund (m AGL)</td>
+</tr>
+<tr>
+<td><code>sunshine_duration</code></td>
+<td>Sonnenscheindauer in der Stunde (Sekunden, max 3600)</td>
+</tr>
+<tr>
+<td><code>cape</code></td>
+<td>Convective Available Potential Energy (J/kg)</td>
+</tr>
+<tr>
+<td><code>geopotential_height_{X}hPa</code></td>
+<td>Geopotentielle Höhe auf Druckniveau X (m MSL)</td>
+</tr>
+<tr>
+<td><code>temperature_{X}hPa</code></td>
+<td>Temperatur auf Druckniveau X (°C)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Druckniveaus:</strong> 1000, 975, 950, 925, 900, 875, 850, 825, 800, 775, 750, 700, 600 hPa</p>
+<p>Diese Niveaus decken den Bereich von ca. 0 m bis 4000 m MSL ab, in Schritten von ~200–250 m.</p>
+<hr />
+<h2 id="2-taupunkt-berechnung">2. Taupunkt-Berechnung<a class="headerlink" href="#2-taupunkt-berechnung" title="Permanent link">&para;</a></h2>
+<p>Falls kein direkter Taupunkt geliefert wird, erfolgt die Berechnung über die <strong>Magnus-Formel</strong>:</p>
+<div class="highlight"><pre><span></span><code>α = ln(RH/100) + (A · T) / (B + T)
+Td = (B · α) / (A - α)
+</code></pre></div>
+<p>Konstanten: <code>A = 17.625</code>, <code>B = 243.04</code></p>
+<hr />
+<h2 id="3-auslosetemperatur-trigger-temperature">3. Auslösetemperatur (Trigger Temperature)<a class="headerlink" href="#3-auslosetemperatur-trigger-temperature" title="Permanent link">&para;</a></h2>
+<p>Die Sonne erwärmt den Boden stärker als die freie Atmosphäre. Das Modell addiert einen <strong>Sonnenschein-Bonus</strong> auf die Bodentemperatur:</p>
+<div class="highlight"><pre><span></span><code>sun_factor = min(1.0, sunshine_duration / 3600)
+T_trigger  = T_surface + 2.0 · sun_factor
+</code></pre></div>
+<ul>
+<li>Bei voller Sonne (3600s): +2.0 °C Überhitzung</li>
+<li>Bei bedecktem Himmel (0s): +0.0 °C</li>
+<li>Teilverhältnisse linear interpoliert</li>
+</ul>
+<hr />
+<h2 id="4-lcl-wolkenbasis-lifting-condensation-level">4. LCL – Wolkenbasis (Lifting Condensation Level)<a class="headerlink" href="#4-lcl-wolkenbasis-lifting-condensation-level" title="Permanent link">&para;</a></h2>
+<p>Die Höhe, ab der das aufsteigende Luftpaket kondensiert (Wolkenbildung), wird mit der <strong>Spread-Faustregel</strong> berechnet:</p>
+<div class="highlight"><pre><span></span><code>Spread  = T_trigger - T_dewpoint
+LCL_AGL = Spread · 125 m/°C
+LCL_MSL = Elevation + LCL_AGL
+</code></pre></div>
+<p>Ein Spread von 10 °C ergibt eine Wolkenbasis von 1250 m über Grund.</p>
+<hr />
+<h2 id="5-paketaufstieg-thermal-index-profil">5. Paketaufstieg – Thermal Index Profil<a class="headerlink" href="#5-paketaufstieg-thermal-index-profil" title="Permanent link">&para;</a></h2>
+<p>Der Kern der Berechnung: Ein virtuelles Luftpaket steigt vom Boden auf und wird mit dem realen Höhenprofil verglichen.</p>
+<h3 id="trockenadiabatischer-aufstieg-unter-lcl">Trockenadiabatischer Aufstieg (unter LCL)<a class="headerlink" href="#trockenadiabatischer-aufstieg-unter-lcl" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code>T_parcel(h) = T_trigger - 0.0098 · (h - elevation)
+</code></pre></div>
+<p>Das Paket kühlt mit dem <strong>DALR</strong> (Dry Adiabatic Lapse Rate) von <strong>9.8 °C/km</strong> ab.</p>
+<h3 id="feuchtadiabatischer-aufstieg-uber-lcl">Feuchtadiabatischer Aufstieg (über LCL)<a class="headerlink" href="#feuchtadiabatischer-aufstieg-uber-lcl" title="Permanent link">&para;</a></h3>
+<p>Über dem LCL wird Kondensationswärme frei. Die Abkühlung verlangsamt sich auf den <strong>SALR</strong> (Saturated Adiabatic Lapse Rate) von ca. <strong>6.0 °C/km</strong>:</p>
+<div class="highlight"><pre><span></span><code>T_parcel(h) = T_trigger - 0.0098 · (LCL - elevation) - 0.006 · (h - LCL)
+</code></pre></div>
+<h3 id="thermal-index-ti">Thermal Index (TI)<a class="headerlink" href="#thermal-index-ti" title="Permanent link">&para;</a></h3>
+<p>Auf jeder Höhenschicht wird der TI berechnet:</p>
+<div class="highlight"><pre><span></span><code>TI = T_environment - T_parcel
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>TI</th>
+<th>Bedeutung</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>TI &lt; 0</td>
+<td>Paket ist <strong>wärmer</strong> als Umgebung → <strong>Steigen</strong></td>
+</tr>
+<tr>
+<td>TI = 0</td>
+<td>Gleichgewicht (Thermik-Obergrenze)</td>
+</tr>
+<tr>
+<td>TI &gt; 0</td>
+<td>Paket ist <strong>kälter</strong> → Sinken, Inversion</td>
+</tr>
+</tbody>
+</table>
+<h3 id="aufstiegs-abbruch">Aufstiegs-Abbruch<a class="headerlink" href="#aufstiegs-abbruch" title="Permanent link">&para;</a></h3>
+<p>Das Paket steigt, solange es mindestens gleich warm oder nur 0.5 °C kälter ist als die Umgebung (Trägheitstoleranz für eine reale Thermikblase):</p>
+<div class="highlight"><pre><span></span><code>Abbruch wenn: T_parcel &lt; T_environment - 0.5
+</code></pre></div>
+<p>Die letzte Höhe, auf der das Paket noch steigt, definiert die <strong>maximale Thermikhöhe</strong>.</p>
+<hr />
+<h2 id="6-grenzschicht-begrenzung">6. Grenzschicht-Begrenzung<a class="headerlink" href="#6-grenzschicht-begrenzung" title="Permanent link">&para;</a></h2>
+<p>Die Grenzschichthöhe (Boundary Layer Height) begrenzt die Thermik zusätzlich:</p>
+<div class="highlight"><pre><span></span><code>BLH_MSL = Elevation + BLH_AGL
+
+Wenn max_thermal_height &gt; BLH_MSL:
+    max_thermal_height = BLH_MSL
+</code></pre></div>
+<p>Die Grenzschicht ist die turbulente, durchmischte Schicht über dem Boden. Thermik durchstösst selten deren Obergrenze.</p>
+<hr />
+<h2 id="7-steigrate-w-convective-velocity-scale">7. Steigrate w* (Convective Velocity Scale)<a class="headerlink" href="#7-steigrate-w-convective-velocity-scale" title="Permanent link">&para;</a></h2>
+<p>Aus der mittleren Temperaturdifferenz und der Thermiktiefe wird die <strong>konvektive Geschwindigkeitsskala</strong> abgeleitet:</p>
+<div class="highlight"><pre><span></span><code>mean_dT       = Σ(T_parcel - T_env) / Anzahl_Schichten
+thermal_depth = max_thermal_height - elevation
+T_kelvin      = T_surface + 273.15
+
+raw_w*  = √( g/T_kelvin · mean_dT · thermal_depth )
+</code></pre></div>
+<p>Dabei ist <code>g = 9.81 m/s²</code>.</p>
+<h3 id="kalibrierung-auf-gleitschirm-variowerte">Kalibrierung auf Gleitschirm-Variowerte<a class="headerlink" href="#kalibrierung-auf-gleitschirm-variowerte" title="Permanent link">&para;</a></h3>
+<p>Das physikalische w* gibt die Geschwindigkeit der Luftmassenkonvektion an. Ein Gleitschirmpilot im Bart erlebt weniger:</p>
+<div class="highlight"><pre><span></span><code>climb_rate = raw_w* · 0.3 · sun_factor
+</code></pre></div>
+<ul>
+<li>Faktor <strong>0.3</strong>: Empirische Kalibrierung (Paketmitte steigt schneller als der Schirm, Abwind am Rand, etc.)</li>
+<li><strong>sun_factor</strong>: Reduziert Steigen proportional zur tatsächlichen Sonnenscheindauer</li>
+<li>Maximum: <strong>6.0 m/s</strong> (Obergrenze für Alpen-Thermik)</li>
+</ul>
+<h3 id="mindesthohe">Mindesthöhe<a class="headerlink" href="#mindesthohe" title="Permanent link">&para;</a></h3>
+<p>Ist die nutzbare Thermikhöhe weniger als 300 m über Grund, wird die Thermik als <strong>nicht nutzbar</strong> gewertet:</p>
+<div class="highlight"><pre><span></span><code>Wenn max_thermal_height &lt; elevation + 300m:
+    rating = 1, climb_rate = 0.0
+</code></pre></div>
+<hr />
+<h2 id="8-gute-rating-010">8. Güte-Rating (0–10)<a class="headerlink" href="#8-gute-rating-010" title="Permanent link">&para;</a></h2>
+<p>Das stündliche Rating leitet sich direkt aus der Steigrate ab:</p>
+<table>
+<thead>
+<tr>
+<th>Steigen (m/s)</th>
+<th>Rating</th>
+<th>Einordnung</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>&lt; 0.5</td>
+<td>0</td>
+<td>Keine Thermik</td>
+</tr>
+<tr>
+<td>0.5 – 1.2</td>
+<td>3</td>
+<td>Schwache Thermik</td>
+</tr>
+<tr>
+<td>1.2 – 2.0</td>
+<td>5</td>
+<td>Moderate Thermik</td>
+</tr>
+<tr>
+<td>2.0 – 3.5</td>
+<td>8</td>
+<td>Gute bis starke Thermik</td>
+</tr>
+<tr>
+<td>&gt; 3.5</td>
+<td>10</td>
+<td>Sehr starke Thermik</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="9-tages-aggregation">9. Tages-Aggregation<a class="headerlink" href="#9-tages-aggregation" title="Permanent link">&para;</a></h2>
+<p>Für die Landkarte werden die stündlichen Werte (Flugstunden 09:00–18:00) zu einem <strong>Tageswert pro Region</strong> verdichtet:</p>
+<table>
+<thead>
+<tr>
+<th>Tageswert</th>
+<th>Aggregation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>climb_rate</code></td>
+<td>Maximum aller Stundenwerte</td>
+</tr>
+<tr>
+<td><code>rating</code></td>
+<td>Mittelwert der besten 3 Stunden</td>
+</tr>
+<tr>
+<td><code>max_height</code></td>
+<td>Maximum aller Stundenwerte</td>
+</tr>
+<tr>
+<td><code>lcl</code></td>
+<td>Durchschnitt aller Stunden mit LCL &gt; 0</td>
+</tr>
+<tr>
+<td><code>cape</code></td>
+<td>Maximum aller Stundenwerte</td>
+</tr>
+</tbody>
+</table>
+<p>Die <strong>Top-3-Regel</strong> beim Rating verhindert, dass eine einzelne gute Stunde den Tageswert dominiert, erlaubt aber dennoch gute Wertungen wenn das Thermiknachmittags-Fenster kurz ist.</p>
+<hr />
+<h2 id="10-datenfluss-architektur">10. Datenfluss-Architektur<a class="headerlink" href="#10-datenfluss-architektur" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code>config.py (24 Regionen mit Zentroid lat/lon)
+     │
+     ▼
+fetch_regions.py
+     │
+     ├── Open-Meteo API (icon_seamless, 3 Tage, alle Regionen in einem Request)
+     │
+     ├── thermik_calculator.py (pro Stunde pro Region)
+     │       ├── Taupunkt (Magnus)
+     │       ├── LCL (Spread · 125)
+     │       ├── Paketaufstieg (DALR/SALR vs. Höhenprofil)
+     │       ├── w* → climb_rate
+     │       └── Rating (0-10)
+     │
+     └── Tages-Aggregation
+            │
+            ▼
+     data/regions_forecast.json
+            │
+            ▼
+     web.py → /api/regions-data
+            │
+            ▼
+     templates/regions.html (Leaflet-Karte mit Rating-Polygonen)
+</code></pre></div>
+<hr />
+<h2 id="physikalische-konstanten">Physikalische Konstanten<a class="headerlink" href="#physikalische-konstanten" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Konstante</th>
+<th>Wert</th>
+<th>Beschreibung</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>g</td>
+<td>9.81 m/s²</td>
+<td>Erdbeschleunigung</td>
+</tr>
+<tr>
+<td>cp</td>
+<td>1005 J/(kg·K)</td>
+<td>Spezifische Wärmekapazität trockener Luft</td>
+</tr>
+<tr>
+<td>R_d</td>
+<td>287.05 J/(kg·K)</td>
+<td>Gaskonstante trockene Luft</td>
+</tr>
+<tr>
+<td>L_v</td>
+<td>2.5 × 10⁶ J/kg</td>
+<td>Verdampfungswärme Wasser</td>
+</tr>
+<tr>
+<td>DALR</td>
+<td>9.8 °C/km</td>
+<td>Trockenadiabatischer Gradient</td>
+</tr>
+<tr>
+<td>SALR</td>
+<td>~6.0 °C/km</td>
+<td>Feuchtadiabatischer Gradient (vereinfacht)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="quellen-und-referenzen">Quellen und Referenzen<a class="headerlink" href="#quellen-und-referenzen" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Deardorff (1970)</strong>: Convective velocity scale w* — Grundlage der Steigrate-Berechnung</li>
+<li><strong>Magnus-Formel</strong>: Standard-Approximation für Sättigungsdampfdruck → Taupunkt</li>
+<li><strong>LCL-Approximation</strong>: Eaton (1917), Spread × 125 m/°C — bewährte Piloten-Faustregel</li>
+<li><strong>Open-Meteo API</strong>: Wetterdaten-Quelle, Modell ICON (DWD) seamless</li>
+<li><strong>swissBOUNDARIES3D</strong>: Grundlage der 24 Thermikregionen-Polygone (Swisstopo)</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": [], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

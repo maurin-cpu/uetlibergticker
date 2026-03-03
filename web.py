@@ -173,7 +173,7 @@ def group_by_days(hourly_data):
     return days_data
 
 
-def format_data_for_charts(hourly_data, pressure_level_data=None, elevation_ref=None):
+def format_data_for_charts(hourly_data, pressure_level_data=None, elevation_ref=None, slope_azimuth=None, slope_angle=None):
     """Formatiert Daten für D3.js Charts inkl. Physik."""
     chart_data = {
         'wind': [],
@@ -248,6 +248,19 @@ def format_data_for_charts(hourly_data, pressure_level_data=None, elevation_ref=
                     surface_sensible_heat_flux=data.get('surface_sensible_heat_flux'),
                     surface_latent_heat_flux=data.get('surface_latent_heat_flux'),
                     shortwave_radiation=data.get('shortwave_radiation'),
+                    direct_radiation=data.get('direct_radiation'),
+                    diffuse_radiation=data.get('diffuse_radiation'),
+                    soil_moisture=data.get('soil_moisture_0_to_1cm'),
+                    soil_temperature=data.get('soil_temperature_0cm'),
+                    updraft=data.get('updraft'),
+                    et0=data.get('et0_fao_evapotranspiration'),
+                    vpd=data.get('vapour_pressure_deficit'),
+                    lifted_index=data.get('lifted_index'),
+                    convective_inhibition=data.get('convective_inhibition'),
+                    snow_depth=data.get('snow_depth'),
+                    timestamp=timestamp,
+                    slope_azimuth=slope_azimuth,
+                    slope_angle=slope_angle,
                 )
                 if 'error' not in therm:
                     therm_climb = therm['climb_rate']
@@ -501,56 +514,97 @@ def api_raw_data():
 
 @app.route('/api/emagramm-data')
 def api_emagramm_data():
-    """Gibt Daten für das Emagramm zurück, inkl. berechnetem Taupunkt."""
-    import requests
+    """Gibt Daten für das Emagramm zurück, inkl. Thermik-Berechnung für Uetliberg/Zürich."""
+    import requests as http_requests
     import math
     from datetime import datetime
     
     try:
-        lat = 45.2517
-        lon = 0.824
+        # Koordinaten aus LOCATION-Config (Uetliberg Balderen)
+        lat = LOCATION.get('latitude', 47.3226)
+        lon = LOCATION.get('longitude', 8.5008)
+        elev_ref = LOCATION.get('elevation_ref', 730)
+
+        # Optionale Stunde via Query-Parameter (?hour=13)
+        requested_hour = request.args.get('hour', type=int)
         
         pressure_levels = [1000, 975, 950, 925, 900, 850, 800, 700, 600, 500]
         
-        hourly_vars = ["temperature_2m", "relative_humidity_2m", "boundary_layer_height", "sunshine_duration"]
+        # Surface-Parameter inkl. neuer Thermik-Variablen
+        hourly_vars = [
+            "temperature_2m", "relative_humidity_2m",
+            "boundary_layer_height", "sunshine_duration",
+            "shortwave_radiation", "direct_radiation", "diffuse_radiation",
+            "soil_moisture_0_to_1cm", "soil_temperature_0cm",
+            "updraft", "vapour_pressure_deficit",
+        ]
         for level in pressure_levels:
             hourly_vars.append(f"temperature_{level}hPa")
             hourly_vars.append(f"relative_humidity_{level}hPa")
             
-        url = "https://api.open-meteo.com/v1/forecast"
         params = {
             "latitude": lat,
             "longitude": lon,
+            "models": "icon_seamless",
             "hourly": ",".join(hourly_vars),
-            "timezone": "auto",
-            "forecast_days": 1
+            "timezone": config.TIMEZONE,
+            "forecast_days": config.FORECAST_DAYS,
         }
         
-        response = requests.get(url, params=params)
+        response = http_requests.get(config.API_URL, params=params, timeout=config.API_TIMEOUT)
         response.raise_for_status()
         data = response.json()
-        
-        now_str = datetime.now().strftime("%Y-%m-%dT%H:00")
+
+        # GFS-Supplement für BLH, LI, CIN
+        gfs_hourly = {}
         try:
-            time_index = data["hourly"]["time"].index(now_str)
-        except ValueError:
-            time_index = 0
-            
-        results = []
+            params_gfs = {
+                "latitude": lat, "longitude": lon,
+                "hourly": ",".join(config.GFS_SUPPLEMENTARY_PARAMS),
+                "models": "gfs_seamless",
+                "forecast_days": config.FORECAST_DAYS,
+                "timezone": config.TIMEZONE,
+            }
+            resp_gfs = http_requests.get(config.API_URL, params=params_gfs, timeout=10)
+            resp_gfs.raise_for_status()
+            gfs_data = resp_gfs.json().get("hourly", {})
+            gfs_times = gfs_data.get("time", [])
+            for i_gfs, ts in enumerate(gfs_times):
+                gfs_hourly[ts] = {}
+                for p in config.GFS_SUPPLEMENTARY_PARAMS:
+                    arr = gfs_data.get(p, [])
+                    gfs_hourly[ts][p] = arr[i_gfs] if i_gfs < len(arr) else None
+        except Exception:
+            pass  # GFS is optional
+
+        times = data["hourly"]["time"]
         
-        # Magnus formel für Taupunkt
-        # constants
+        # Bestimme Stunde: requested > aktuelle Stunde > erste verfügbar
+        if requested_hour is not None:
+            # Finde den nächsten Zeitpunkt mit dieser Stunde (heute oder morgen)
+            time_index = 0
+            for idx, t in enumerate(times):
+                dt = datetime.fromisoformat(t)
+                if dt.hour == requested_hour:
+                    time_index = idx
+                    break
+        else:
+            now_str = datetime.now().strftime("%Y-%m-%dT%H:00")
+            try:
+                time_index = times.index(now_str)
+            except ValueError:
+                time_index = 0
+            
+        # Druck-Niveau-Daten für gewählte Stunde
+        results = []
         A = 17.625
         B = 243.04
         
         for level in pressure_levels:
             temp_val = data["hourly"][f"temperature_{level}hPa"][time_index]
             rh_val = data["hourly"][f"relative_humidity_{level}hPa"][time_index]
-            
-            # calculate dewpoint
             alpha = math.log(rh_val/100.0) + ((A * temp_val) / (B + temp_val))
             dewpoint_val = (B * alpha) / (A - alpha)
-            
             results.append({
                 "pressure": level,
                 "temperature": temp_val,
@@ -558,29 +612,131 @@ def api_emagramm_data():
                 "relative_humidity": rh_val
             })
             
-        # Berechne Thermik-Kurve
-        surf_temp = data["hourly"]["temperature_2m"][time_index]
-        surf_rh = data["hourly"]["relative_humidity_2m"][time_index]
+        # Volle Thermik-Berechnung für gewählte Stunde
+        def _get_hourly(key, idx):
+            arr = data["hourly"].get(key)
+            if arr and idx < len(arr):
+                return arr[idx]
+            # Fallback: GFS
+            ts = times[idx] if idx < len(times) else None
+            if ts and ts in gfs_hourly:
+                return gfs_hourly[ts].get(key)
+            return None
+
+        surf_temp = _get_hourly("temperature_2m", time_index)
+        surf_rh = _get_hourly("relative_humidity_2m", time_index)
         surf_dew = calculate_dewpoint(surf_temp, surf_rh)
         
         p_levels = []
         for r in results:
             p_levels.append({'pressure': r['pressure'], 'temp': r['temperature']})
-            
+
+        # BLH: Bevorzuge icon_seamless, Fallback GFS
+        blh_val = _get_hourly("boundary_layer_height", time_index)
+        ts_current = times[time_index] if time_index < len(times) else None
+        if blh_val is None and ts_current and ts_current in gfs_hourly:
+            blh_val = gfs_hourly[ts_current].get("boundary_layer_height")
+
+        # LI/CIN aus GFS
+        li_val = None
+        cin_val = None
+        if ts_current and ts_current in gfs_hourly:
+            li_val = gfs_hourly[ts_current].get("lifted_index")
+            cin_val = gfs_hourly[ts_current].get("convective_inhibition")
+
         therm = calculate_thermal_profile(
             surface_temp=surf_temp,
             surface_dewpoint=surf_dew,
-            elevation_m=LOCATION.get('elevation_ref', 850),
+            elevation_m=elev_ref,
             pressure_levels_data=p_levels,
-            boundary_layer_height_agl=data["hourly"]["boundary_layer_height"][time_index],
-            sunshine_duration_s=data["hourly"]["sunshine_duration"][time_index]
+            boundary_layer_height_agl=blh_val,
+            sunshine_duration_s=_get_hourly("sunshine_duration", time_index),
+            shortwave_radiation=_get_hourly("shortwave_radiation", time_index),
+            direct_radiation=_get_hourly("direct_radiation", time_index),
+            diffuse_radiation=_get_hourly("diffuse_radiation", time_index),
+            soil_moisture=_get_hourly("soil_moisture_0_to_1cm", time_index),
+            soil_temperature=_get_hourly("soil_temperature_0cm", time_index),
+            updraft=_get_hourly("updraft", time_index),
+            vpd=_get_hourly("vapour_pressure_deficit", time_index),
+            lifted_index=li_val,
+            convective_inhibition=cin_val,
+            snow_depth=_get_hourly("snow_depth", time_index),
+            timestamp=ts_current,
+            slope_azimuth=LOCATION.get('slope_azimuth'),
+            slope_angle=LOCATION.get('slope_angle'),
         )
+
+        # Stündliche Thermik-Übersicht für alle Flugstunden
+        hourly_thermal = []
+        for idx, t in enumerate(times):
+            dt = datetime.fromisoformat(t)
+            h = dt.hour
+            if h < FLIGHT_HOURS_START or h >= FLIGHT_HOURS_END:
+                continue
+            
+            s_temp = _get_hourly("temperature_2m", idx)
+            s_rh = _get_hourly("relative_humidity_2m", idx)
+            s_dew = calculate_dewpoint(s_temp, s_rh) if s_temp and s_rh else None
+            
+            h_p_levels = []
+            for level in pressure_levels:
+                t_val = data["hourly"].get(f"temperature_{level}hPa", [None]*(idx+1))
+                t_val = t_val[idx] if idx < len(t_val) else None
+                if t_val is not None:
+                    h_p_levels.append({'pressure': level, 'temp': t_val})
+
+            # BLH/LI/CIN aus GFS
+            ts_h = times[idx]
+            h_blh = _get_hourly("boundary_layer_height", idx)
+            if h_blh is None and ts_h in gfs_hourly:
+                h_blh = gfs_hourly[ts_h].get("boundary_layer_height")
+            h_li = gfs_hourly.get(ts_h, {}).get("lifted_index")
+            h_cin = gfs_hourly.get(ts_h, {}).get("convective_inhibition")
+
+            if s_temp is not None and h_p_levels:
+                h_therm = calculate_thermal_profile(
+                    surface_temp=s_temp,
+                    surface_dewpoint=s_dew,
+                    elevation_m=elev_ref,
+                    pressure_levels_data=h_p_levels,
+                    boundary_layer_height_agl=h_blh,
+                    sunshine_duration_s=_get_hourly("sunshine_duration", idx),
+                    shortwave_radiation=_get_hourly("shortwave_radiation", idx),
+                    direct_radiation=_get_hourly("direct_radiation", idx),
+                    diffuse_radiation=_get_hourly("diffuse_radiation", idx),
+                    soil_moisture=_get_hourly("soil_moisture_0_to_1cm", idx),
+                    soil_temperature=_get_hourly("soil_temperature_0cm", idx),
+                    updraft=_get_hourly("updraft", idx),
+                    vpd=_get_hourly("vapour_pressure_deficit", idx),
+                    lifted_index=h_li,
+                    convective_inhibition=h_cin,
+                    snow_depth=_get_hourly("snow_depth", idx),
+                    timestamp=ts_h,
+                    slope_azimuth=LOCATION.get('slope_azimuth'),
+                    slope_angle=LOCATION.get('slope_angle'),
+                )
+                if 'error' not in h_therm:
+                    hourly_thermal.append({
+                        'hour': h,
+                        'date': dt.strftime("%Y-%m-%d"),
+                        'timestamp': t,
+                        'climb_rate': h_therm['climb_rate'],
+                        'rating': h_therm['rating'],
+                        'max_height': h_therm['max_height'],
+                    })
             
         return jsonify({
             'success': True, 
             'data': results,
             'thermal': therm,
-            'timestamp': data["hourly"]["time"][time_index]
+            'hourly_thermal': hourly_thermal,
+            'timestamp': times[time_index],
+            'selected_hour': datetime.fromisoformat(times[time_index]).hour,
+            'location': {
+                'name': LOCATION.get('name', 'Uetliberg'),
+                'lat': lat, 'lon': lon,
+                'elevation_ref': elev_ref,
+            },
         })
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -740,11 +896,43 @@ def api_weather():
         # Formatiere Daten für jeden Tag
         days_formatted = {}
         for date_key, day_hourly_data in days_data.items():
-            days_formatted[date_key] = format_data_for_charts(day_hourly_data, pressure_level_data)
+            days_formatted[date_key] = format_data_for_charts(
+                day_hourly_data, 
+                pressure_level_data,
+                slope_azimuth=LOCATION.get('slope_azimuth'),
+                slope_angle=LOCATION.get('slope_angle')
+            )
 
         
         # Sortiere Tage chronologisch
         sorted_dates = sorted(days_formatted.keys())
+
+        # Thermik-Übersicht pro Tag: Peak-Werte aus den stündlichen Thermik-Daten
+        thermal_overview = {}
+        for date_key, day_data in days_formatted.items():
+            therm_list = day_data.get('thermik', [])
+            peak_climb = 0.0
+            peak_rating = 0
+            best_hour = None
+            total_climb = 0.0
+            count = 0
+            for th in therm_list:
+                cr = th.get('climb_rate', 0) or 0
+                rt = th.get('rating', 0) or 0
+                if cr > peak_climb:
+                    peak_climb = cr
+                    best_hour = th.get('time')
+                if rt > peak_rating:
+                    peak_rating = rt
+                total_climb += cr
+                count += 1
+            avg_climb = total_climb / count if count > 0 else 0
+            thermal_overview[date_key] = {
+                'peak_climb': round(peak_climb, 1),
+                'avg_climb': round(avg_climb, 1),
+                'peak_rating': peak_rating,
+                'best_hour': best_hour,
+            }
         
         return jsonify({
             'success': True,
@@ -755,6 +943,7 @@ def api_weather():
             },
             'days': days_formatted,
             'dates': sorted_dates,
+            'thermal_overview': thermal_overview,
             'total_hours': len(flight_hours_data),
             '_debug_source': weather_data.get('_debug_source'),
             '_debug_path': weather_data.get('_debug_path'),
@@ -777,6 +966,21 @@ def api_weather_raw():
     except Exception as e:
         return jsonify({
             'error': str(e)
+        }), 500
+
+
+@app.route('/api/foehn')
+def api_foehn():
+    """API-Endpoint für Föhn-Indikatoren (Druckgradient, Höhenwind, Warnstufe)."""
+    try:
+        from foehn_indicators import get_foehn_for_dashboard
+        result = get_foehn_for_dashboard(forecast_days=2)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'foehn': None
         }), 500
 
 

@@ -420,6 +420,85 @@
             font-weight: 500;
         }
 
+        /* ========== FÖHN INDICATOR ========== */
+        .foehn-box {
+            background: var(--color-card);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 16px 20px;
+            margin-bottom: 24px;
+            box-shadow: var(--shadow-lg);
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .foehn-box.none {
+            border-left: 4px solid #64748B;
+            background: rgba(100, 116, 139, 0.08);
+        }
+
+        .foehn-box.caution {
+            border-left: 4px solid var(--color-warning);
+            background: rgba(245, 158, 11, 0.12);
+        }
+
+        .foehn-box.danger {
+            border-left: 4px solid var(--color-danger);
+            background: rgba(239, 68, 68, 0.12);
+        }
+
+        .foehn-icon {
+            font-size: 28px;
+            line-height: 1;
+        }
+
+        .foehn-box.none .foehn-icon {
+            color: #64748B;
+        }
+
+        .foehn-box.caution .foehn-icon {
+            color: var(--color-warning);
+        }
+
+        .foehn-box.danger .foehn-icon {
+            color: var(--color-danger);
+        }
+
+        .foehn-content {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .foehn-label {
+            font-size: 14px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .foehn-message {
+            font-size: 12px;
+            color: var(--color-text-light);
+            line-height: 1.5;
+        }
+
+        .foehn-details {
+            font-size: 11px;
+            color: var(--color-text-light);
+            margin-top: 8px;
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .foehn-details span {
+            background: rgba(255, 255, 255, 0.06);
+            padding: 4px 8px;
+            border-radius: 6px;
+        }
+
         /* ========== TOOLTIP ========== */
         .tooltip {
             position: absolute;
@@ -610,6 +689,29 @@
             </div>
         </div>
 
+        <!-- THERMAL OVERVIEW BADGE -->
+        <div id="thermal-overview"
+            style="display:none; background: var(--color-card); backdrop-filter: blur(12px); border: 1px solid var(--glass-border); border-radius: 16px; padding: 14px 20px; margin-bottom: 24px; box-shadow: var(--shadow-lg);">
+            <div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
+                <div style="font-size:28px;" id="thermal-icon">☀️</div>
+                <div style="flex:1; min-width:200px;">
+                    <div style="font-size:14px; font-weight:700; margin-bottom:4px;" id="thermal-label">Thermik</div>
+                    <div style="font-size:12px; color:var(--color-text-light); line-height:1.5;" id="thermal-detail">
+                    </div>
+                </div>
+                <div style="display:flex; gap:12px; flex-wrap:wrap;">
+                    <div style="text-align:center;">
+                        <div style="font-size:24px; font-weight:900;" id="thermal-climb">-</div>
+                        <div style="font-size:11px; color:var(--color-text-light);">m/s Peak</div>
+                    </div>
+                    <div style="text-align:center;">
+                        <div style="font-size:24px; font-weight:900;" id="thermal-rating-val">-</div>
+                        <div style="font-size:11px; color:var(--color-text-light);">Rating</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- NAV BAR -->
         <div class="nav-bar">
             <span class="location-info" id="location-info"></span>
@@ -625,9 +727,24 @@
                     onmouseover="this.style.background='rgba(99,102,241,0.35)';this.style.transform='translateY(-2px)'"
                     onmouseout="this.style.background='rgba(99,102,241,0.2)';this.style.transform='none'">⚙
                     Konfiguration</a>
+                <a href="http://127.0.0.1:8000" target="_blank"
+                    style="padding:10px 20px;background:rgba(245,158,11,0.2);color:#FBBF24;border:1px solid rgba(245,158,11,0.3);border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;text-decoration:none;text-transform:uppercase;letter-spacing:0.5px;transition:all 0.3s ease;"
+                    onmouseover="this.style.background='rgba(245,158,11,0.35)';this.style.transform='translateY(-2px)'"
+                    onmouseout="this.style.background='rgba(245,158,11,0.2)';this.style.transform='none'">📚
+                    Dokumentation</a>
                 <button class="trigger-update-button" id="trigger-update-btn">Daten aktualisieren</button>
             </div>
             <div class="update-message" id="update-message"></div>
+        </div>
+
+        <!-- FÖHN INDICATOR -->
+        <div class="foehn-box none" id="foehn-box" style="display:none;">
+            <div class="foehn-icon" id="foehn-icon">💨</div>
+            <div class="foehn-content">
+                <div class="foehn-label" id="foehn-label">Föhn</div>
+                <div class="foehn-message" id="foehn-message"></div>
+                <div class="foehn-details" id="foehn-details"></div>
+            </div>
         </div>
 
         <!-- EVALUATION DETAILS -->
@@ -722,11 +839,18 @@
         // ========== DATA LOADING ==========
         async function loadData() {
             try {
-                const [weatherResp, evalResp] = await Promise.all([
-                    fetch('/api/weather'), fetch('/api/evaluation')
+                const [weatherResp, evalResp, foehnResp] = await Promise.all([
+                    fetch('/api/weather'), fetch('/api/evaluation'), fetch('/api/foehn')
                 ]);
                 const weatherResult = await weatherResp.json();
                 const evalResult = await evalResp.json();
+                const foehnResult = await foehnResp.json();
+
+                if (foehnResult.success && foehnResult.foehn) {
+                    displayFoehn(foehnResult.foehn);
+                } else {
+                    document.getElementById('foehn-box').style.display = 'none';
+                }
 
                 if (weatherResult.success) {
                     // Check if data is empty (no weather data fetched yet)
@@ -760,6 +884,7 @@
 
         function updateAll(date) {
             buildHourlyGrid(date);
+            displayThermalOverview(date);
             if (evaluationData?.[date]) {
                 displayHeroBanner(evaluationData[date]);
                 displayEvaluation(evaluationData[date]);
@@ -794,7 +919,28 @@
                 `${data.location.name} \u2022 Startrichtung: ${data.location.windrichtung} \u2022 ${h.start}\u2013${h.end} Uhr`;
         }
 
+        function displayFoehn(foehn) {
+            const box = document.getElementById('foehn-box');
+            const icon = document.getElementById('foehn-icon');
+            const label = document.getElementById('foehn-label');
+            const message = document.getElementById('foehn-message');
+            const details = document.getElementById('foehn-details');
 
+            box.className = 'foehn-box ' + (foehn.level || 'none');
+            box.style.display = 'flex';
+
+            const icons = { none: '\uD83C\uDF2A', caution: '\u26A0\uFE0F', danger: '\u26A0\uFE0F' };
+            icon.textContent = icons[foehn.level] || icons.none;
+
+            label.textContent = 'F\u00F6hn: ' + (foehn.label || 'Kein F\u00F6hn');
+            message.textContent = foehn.message || '';
+
+            const parts = [];
+            if (foehn.delta_p_hpa != null) parts.push('\u0394P: ' + foehn.delta_p_hpa + ' hPa');
+            if (foehn.crest_wind_kmh != null) parts.push('700hPa: ' + foehn.crest_wind_kmh + ' km/h');
+            if (foehn.humidity_nord != null) parts.push('LF: ' + foehn.humidity_nord + '%');
+            details.innerHTML = parts.map(p => '<span>' + p + '</span>').join('');
+        }
 
         // ========== HERO BANNER ==========
         function displayHeroBanner(ev) {
@@ -851,6 +997,56 @@
             document.getElementById('recommendation').textContent = ev.recommendation || '-';
         }
 
+        // ========== THERMAL OVERVIEW ==========
+        function displayThermalOverview(date) {
+            const box = document.getElementById('thermal-overview');
+            if (!box || !weatherData?.thermal_overview?.[date]) {
+                if (box) box.style.display = 'none';
+                return;
+            }
+            const t = weatherData.thermal_overview[date];
+            const climb = t.peak_climb || 0;
+            const rating = t.peak_rating || 0;
+            const bestHour = t.best_hour ? new Date(t.best_hour).getHours() + ':00' : '-';
+
+            // Anzeige
+            document.getElementById('thermal-climb').textContent = climb.toFixed(1);
+            document.getElementById('thermal-rating-val').textContent = rating + '/10';
+
+            // Farbe
+            const icon = document.getElementById('thermal-icon');
+            const label = document.getElementById('thermal-label');
+            const detail = document.getElementById('thermal-detail');
+
+            if (climb >= 2.0) {
+                icon.textContent = '🔥';
+                label.textContent = 'Starke Thermik';
+                label.style.color = '#34D399';
+                document.getElementById('thermal-climb').style.color = '#34D399';
+                box.style.borderLeft = '4px solid #10B981';
+            } else if (climb >= 1.0) {
+                icon.textContent = '☀️';
+                label.textContent = 'Moderate Thermik';
+                label.style.color = '#FBBF24';
+                document.getElementById('thermal-climb').style.color = '#FBBF24';
+                box.style.borderLeft = '4px solid #F59E0B';
+            } else if (climb > 0) {
+                icon.textContent = '⛅';
+                label.textContent = 'Schwache Thermik';
+                label.style.color = '#94A3B8';
+                document.getElementById('thermal-climb').style.color = '#94A3B8';
+                box.style.borderLeft = '4px solid #64748B';
+            } else {
+                icon.textContent = '☁️';
+                label.textContent = 'Keine Thermik';
+                label.style.color = '#64748B';
+                document.getElementById('thermal-climb').style.color = '#64748B';
+                box.style.borderLeft = '4px solid #334155';
+            }
+            detail.textContent = `Ø ${(t.avg_climb || 0).toFixed(1)} m/s · Beste Stunde: ${bestHour}`;
+            box.style.display = 'block';
+        }
+
         // ========== HOURLY GRID ==========
         function buildHourlyGrid(date) {
             const container = document.getElementById('hourly-grid');
@@ -874,7 +1070,8 @@
                 const p = precips[i] || {};
                 hours.push({
                     hour: h, speed: w.speed, gusts: w.gusts, direction: w.direction,
-                    cape: t.cape || 0, cover: cl.cover ?? null, height: cl.height ?? null,
+                    cape: t.cape || 0, climb_rate: t.climb_rate || 0, rating: t.rating || 0,
+                    cover: cl.cover ?? null, height: cl.height ?? null,
                     precip: p.amount || 0, _precip: p.amount || 0
                 });
             });
@@ -893,7 +1090,7 @@
                 { label: 'Wind km/h', key: 'wind' },
                 { label: 'Böen km/h', key: 'gusts' },
                 { label: 'Richtung', key: 'dir' },
-                { label: 'CAPE J/kg', key: 'cape' },
+                { label: 'Thermik m/s', key: 'climb' },
                 { label: 'Wolken', key: 'cloud' },
                 { label: 'Regen', key: 'rain' }
             ];
@@ -978,21 +1175,25 @@
                         lbl.style.color = ok ? '#34D399' : '#F87171';
                         lbl.textContent = getWindDirectionName(h.direction);
                         cell.appendChild(lbl);
-                    } else if (row.key === 'cape') {
+                    } else if (row.key === 'climb') {
+                        const cr = h.climb_rate || 0;
                         const bar = document.createElement('div');
                         bar.className = 'cape-bar';
-                        const maxH = 20;
-                        const barH = Math.min(maxH, Math.max(2, (h.cape / 1000) * maxH));
+                        const maxH = 24;
+                        const barH = Math.min(maxH, Math.max(2, (cr / 3.0) * maxH));
                         bar.style.height = barH + 'px';
-                        if (h.cape > 500) bar.style.background = '#F59E0B';
-                        else if (h.cape > 200) bar.style.background = '#FBBF24';
-                        else bar.style.background = 'rgba(255,255,255,0.15)';
+                        if (cr >= 2.5) bar.style.background = '#EF4444';
+                        else if (cr >= 1.5) bar.style.background = '#F97316';
+                        else if (cr >= 0.8) bar.style.background = '#EAB308';
+                        else if (cr > 0) bar.style.background = '#FDE047';
+                        else bar.style.background = 'rgba(255,255,255,0.08)';
                         cell.appendChild(bar);
-                        if (h.cape > 0) {
+                        if (cr > 0) {
                             const v = document.createElement('div');
-                            v.style.fontSize = '9px';
-                            v.style.color = 'var(--color-text-light)';
-                            v.textContent = h.cape.toFixed(0);
+                            v.style.fontSize = '10px';
+                            v.style.fontWeight = '700';
+                            v.style.color = cr >= 1.5 ? '#F97316' : cr >= 0.8 ? '#EAB308' : 'var(--color-text-light)';
+                            v.textContent = cr.toFixed(1);
                             cell.appendChild(v);
                         }
                     } else if (row.key === 'cloud') {

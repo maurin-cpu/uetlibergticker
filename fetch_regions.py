@@ -105,6 +105,15 @@ def fetch_and_calculate_regions():
                 shf = _safe_get(hourly, "surface_sensible_heat_flux", i)
                 lhf = _safe_get(hourly, "surface_latent_heat_flux", i)
                 swr = _safe_get(hourly, "shortwave_radiation", i)
+                dir_rad = _safe_get(hourly, "direct_radiation", i)
+                diff_rad = _safe_get(hourly, "diffuse_radiation", i)
+                sm = _safe_get(hourly, "soil_moisture_0_to_1cm", i)
+                st = _safe_get(hourly, "soil_temperature_0cm", i)
+                upd = _safe_get(hourly, "updraft", i)
+                et0_val = _safe_get(hourly, "et0_fao_evapotranspiration", i)
+                vpd_val = _safe_get(hourly, "vapour_pressure_deficit", i)
+                li_val = _safe_get(hourly, "lifted_index", i)
+                cin_val = _safe_get(hourly, "convective_inhibition", i)
 
                 # --- Höhenprofil extrahieren ---
                 p_levels = []
@@ -132,6 +141,15 @@ def fetch_and_calculate_regions():
                     surface_sensible_heat_flux=shf,
                     surface_latent_heat_flux=lhf,
                     shortwave_radiation=swr,
+                    direct_radiation=dir_rad,
+                    diffuse_radiation=diff_rad,
+                    soil_moisture=sm,
+                    soil_temperature=st,
+                    updraft=upd,
+                    et0=et0_val,
+                    vpd=vpd_val,
+                    lifted_index=li_val,
+                    convective_inhibition=cin_val,
                 )
 
                 if "error" in therm:

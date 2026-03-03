@@ -1,0 +1,76 @@
+﻿Region_ID,Point_ID,Region_Name,Point_Name,Latitude,Longitude,Elevation_Ref_m,Makro_Großraum,Flugmeteorologische_Charakteristik,Warum_eigenständig_sinnvoll,Einzigartigkeit_für_Gleitschirmflieger
+zentralwallis,zentralwallis_p1,Zentralwallis (Sion–Sierre),Zentralwallis (Sion–Sierre) - P1,46.4653,7.988075,2100,Westl. Zentralalpen,"Extrem trocken, sehr hohe Basis",Wärmstes Binnenklima CH,5–8 m/s Steigen möglich
+zentralwallis,zentralwallis_p2,Zentralwallis (Sion–Sierre),Zentralwallis (Sion–Sierre) - P2,46.470056,8.050322,2100,Westl. Zentralalpen,"Extrem trocken, sehr hohe Basis",Wärmstes Binnenklima CH,5–8 m/s Steigen möglich
+aletsch_loetschental,aletsch_loetschental_p1,Aletsch–Lötschental,Aletsch–Lötschental - P1,46.067609,7.642699,2000,Westl. Zentralalpen,Gletscherkühlung beeinflusst Thermik,Topografisch isoliert,Starke Hangtrigger
+aletsch_loetschental,aletsch_loetschental_p2,Aletsch–Lötschental,Aletsch–Lötschental - P2,46.0632,7.436002,2000,Westl. Zentralalpen,Gletscherkühlung beeinflusst Thermik,Topografisch isoliert,Starke Hangtrigger
+aletsch_loetschental,aletsch_loetschental_p3,Aletsch–Lötschental,Aletsch–Lötschental - P3,46.0632,7.820366,2000,Westl. Zentralalpen,Gletscherkühlung beeinflusst Thermik,Topografisch isoliert,Starke Hangtrigger
+unterwallis,unterwallis_p1,Unterwallis,Unterwallis - P1,46.165262,7.318989,2200,Westl. Zentralalpen,"Einfluss Genfersee, früher Talwind",Rhone-Haupttal West,Früher Thermikbeginn
+unterwallis,unterwallis_p2,Unterwallis,Unterwallis - P2,46.193995,7.567368,2200,Westl. Zentralalpen,"Einfluss Genfersee, früher Talwind",Rhone-Haupttal West,Früher Thermikbeginn
+waadtlaender_alpen,waadtlaender_alpen_p1,Waadtländer Alpen,Waadtländer Alpen - P1,46.271685,7.010207,1600,Voralpen,,,
+waadtlaender_alpen,waadtlaender_alpen_p2,Waadtländer Alpen,Waadtländer Alpen - P2,46.291333,7.089584,1600,Voralpen,,,
+oberwallis_goms,oberwallis_goms_p1,Oberwallis (Goms),Oberwallis (Goms) - P1,46.429334,8.191583,2200,Westl. Zentralalpen,"Später Start, hohe Arbeitshöhe",Eigenes Hochgebirgsklima,Lange Hochalpentraversen
+tessin_nord,tessin_nord_p1,Tessin Nord (Leventina),Tessin Nord (Leventina) - P1,46.421617,8.945065,2000,Alpensüdflanke,Früher Thermikbeginn,Gotthard-Südseite eigenständig,Mediterrane Frühthermik
+tessin_nord,tessin_nord_p2,Tessin Nord (Leventina),Tessin Nord (Leventina) - P2,46.443637,8.59391,2000,Alpensüdflanke,Früher Thermikbeginn,Gotthard-Südseite eigenständig,Mediterrane Frühthermik
+tessin_nord,tessin_nord_p3,Tessin Nord (Leventina),Tessin Nord (Leventina) - P3,46.443637,8.964793,2000,Alpensüdflanke,Früher Thermikbeginn,Gotthard-Südseite eigenständig,Mediterrane Frühthermik
+tessin_zentral,tessin_zentral_p1,Tessin Zentral (Maggia/Locarno),Tessin Zentral (Maggia/Locarno) - P1,46.284383,8.944508,1650,Alpensüdflanke,Sehr starke Einstrahlung,Seeeinfluss Lago Maggiore,Früher Basisaufbau
+tessin_zentral,tessin_zentral_p2,Tessin Zentral (Maggia/Locarno),Tessin Zentral (Maggia/Locarno) - P2,46.245921,8.65792,1650,Alpensüdflanke,Sehr starke Einstrahlung,Seeeinfluss Lago Maggiore,Früher Basisaufbau
+tessin_zentral,tessin_zentral_p3,Tessin Zentral (Maggia/Locarno),Tessin Zentral (Maggia/Locarno) - P3,46.245921,9.069488,1650,Alpensüdflanke,Sehr starke Einstrahlung,Seeeinfluss Lago Maggiore,Früher Basisaufbau
+engadin_unter,engadin_unter_p1,Engadin Unter,Engadin Unter - P1,46.579209,9.529774,2100,Östl. Zentralalpen,"Trockener, kontinentaler",Abgetrennt durch Talenge,Lange Strecken Richtung Tirol
+engadin_unter,engadin_unter_p2,Engadin Unter,Engadin Unter - P2,46.588444,9.304837,2100,Östl. Zentralalpen,"Trockener, kontinentaler",Abgetrennt durch Talenge,Lange Strecken Richtung Tirol
+engadin_unter,engadin_unter_p3,Engadin Unter,Engadin Unter - P3,46.588444,9.669002,2100,Östl. Zentralalpen,"Trockener, kontinentaler",Abgetrennt durch Talenge,Lange Strecken Richtung Tirol
+engadin_ober,engadin_ober_p1,Engadin Ober,Engadin Ober - P1,46.594673,10.044924,2450,Östl. Zentralalpen,Malojawind-System,Eigenständiges Ost-West-Tal,Homogene Hochthermik
+engadin_ober,engadin_ober_p2,Engadin Ober,Engadin Ober - P2,46.557395,9.862747,2450,Östl. Zentralalpen,Malojawind-System,Eigenständiges Ost-West-Tal,Homogene Hochthermik
+engadin_ober,engadin_ober_p3,Engadin Ober,Engadin Ober - P3,46.557395,10.17462,2450,Östl. Zentralalpen,Malojawind-System,Eigenständiges Ost-West-Tal,Homogene Hochthermik
+chur_mittelbuenden,chur_mittelbuenden_p1,Chur Mittelbuenden,Chur Mittelbuenden - P1,46.832377,9.814129,1500,,,,
+chur_mittelbuenden,chur_mittelbuenden_p2,Chur Mittelbuenden,Chur Mittelbuenden - P2,46.859941,9.708795,1500,,,,
+chur_mittelbuenden,chur_mittelbuenden_p3,Chur Mittelbuenden,Chur Mittelbuenden - P3,46.859941,9.938433,1500,,,,
+surselva,surselva_p1,Surselva,Surselva - P1,47.167534,9.497834,2200,Östl. Zentralalpen,Vorderrhein-Talwindsystem,Eigene Einzugsgebietslogik,Gute XC-Achse West–Ost
+surselva,surselva_p2,Surselva,Surselva - P2,47.19139,9.47266,2200,Östl. Zentralalpen,Vorderrhein-Talwindsystem,Eigene Einzugsgebietslogik,Gute XC-Achse West–Ost
+alpstein,alpstein_p1,Alpstein,Alpstein - P1,47.294945,9.202799,1640,Alpennordflanke,"Föhnanfällig, steile Südabbrüche",Mikroklimatisch isoliert,Extrem kräftige Hangthermik
+alpstein,alpstein_p2,Alpstein,Alpstein - P2,47.314055,8.956898,1640,Alpennordflanke,"Föhnanfällig, steile Südabbrüche",Mikroklimatisch isoliert,Extrem kräftige Hangthermik
+alpstein,alpstein_p3,Alpstein,Alpstein - P3,47.314055,9.312422,1640,Alpennordflanke,"Föhnanfällig, steile Südabbrüche",Mikroklimatisch isoliert,Extrem kräftige Hangthermik
+zentralschweizer_voralpen,zentralschweizer_voralpen_p1,Zentralschweizer Voralpen,Zentralschweizer Voralpen - P1,46.797564,8.607071,1860,Alpennordflanke,See-Wind-Effekte (Vierwaldstättersee),Lokale Tal-Seewindsysteme,Kombi See-/Hangthermik
+zentralschweizer_voralpen,zentralschweizer_voralpen_p2,Zentralschweizer Voralpen,Zentralschweizer Voralpen - P2,46.854313,8.194,1860,Alpennordflanke,See-Wind-Effekte (Vierwaldstättersee),Lokale Tal-Seewindsysteme,Kombi See-/Hangthermik
+zentralschweizer_voralpen,zentralschweizer_voralpen_p3,Zentralschweizer Voralpen,Zentralschweizer Voralpen - P3,46.854313,8.680144,1860,Alpennordflanke,See-Wind-Effekte (Vierwaldstättersee),Lokale Tal-Seewindsysteme,Kombi See-/Hangthermik
+urner_alpen,urner_alpen_p1,Urner Alpen,Urner Alpen - P1,46.723121,9.040779,1500,Nordalpen,Reuss-Talwindsystem,Wasserscheide Gotthard,Föhn-Schnittstelle
+urner_alpen,urner_alpen_p2,Urner Alpen,Urner Alpen - P2,46.707649,8.820506,1500,Nordalpen,Reuss-Talwindsystem,Wasserscheide Gotthard,Föhn-Schnittstelle
+urner_alpen,urner_alpen_p3,Urner Alpen,Urner Alpen - P3,46.707649,9.182984,1500,Nordalpen,Reuss-Talwindsystem,Wasserscheide Gotthard,Föhn-Schnittstelle
+glarnerland,glarnerland_p1,Glarnerland,Glarnerland - P1,46.980447,9.173923,1400,Alpennordflanke,Stark kanalisiertes Talwindsystem,Eigenständiges Linth-System,Dynamische Talwindthermik
+glarnerland,glarnerland_p2,Glarnerland,Glarnerland - P2,47.001585,9.011799,1400,Alpennordflanke,Stark kanalisiertes Talwindsystem,Eigenständiges Linth-System,Dynamische Talwindthermik
+glarnerland,glarnerland_p3,Glarnerland,Glarnerland - P3,47.001585,9.273815,1400,Alpennordflanke,Stark kanalisiertes Talwindsystem,Eigenständiges Linth-System,Dynamische Talwindthermik
+berner_voralpen,berner_voralpen_p1,Berner Voralpen,Berner Voralpen - P1,46.658681,8.088609,1500,,,,
+berner_voralpen,berner_voralpen_p2,Berner Voralpen,Berner Voralpen - P2,46.661138,7.937931,1500,,,,
+berner_voralpen,berner_voralpen_p3,Berner Voralpen,Berner Voralpen - P3,46.661138,8.261035,1500,,,,
+freiburger_voralpen,freiburger_voralpen_p1,Freiburger Voralpen,Freiburger Voralpen - P1,46.546438,7.462931,1950,Alpennordflanke,Staueffekte bei Nordwest,Hydrologisch getrennt,Frühe Hangthermik
+freiburger_voralpen,freiburger_voralpen_p2,Freiburger Voralpen,Freiburger Voralpen - P2,46.524751,7.199686,1950,Alpennordflanke,Staueffekte bei Nordwest,Hydrologisch getrennt,Frühe Hangthermik
+freiburger_voralpen,freiburger_voralpen_p3,Freiburger Voralpen,Freiburger Voralpen - P3,46.524751,7.606038,1950,Alpennordflanke,Staueffekte bei Nordwest,Hydrologisch getrennt,Frühe Hangthermik
+genferseeregion,genferseeregion_p1,Genferseeregion,Genferseeregion - P1,46.310074,6.236176,800,Mittelland,,,
+westliches_mittelland,westliches_mittelland_p1,Westliches Mittelland,Westliches Mittelland - P1,46.798505,6.875752,700,Mittelland,"Flachlandthermik, starke Inversionen",Nebelregime deutlich anders,Strecken bei Bise möglich
+westliches_mittelland,westliches_mittelland_p2,Westliches Mittelland,Westliches Mittelland - P2,46.821059,6.726051,700,Mittelland,"Flachlandthermik, starke Inversionen",Nebelregime deutlich anders,Strecken bei Bise möglich
+westliches_mittelland,westliches_mittelland_p3,Westliches Mittelland,Westliches Mittelland - P3,46.821059,7.172062,700,Mittelland,"Flachlandthermik, starke Inversionen",Nebelregime deutlich anders,Strecken bei Bise möglich
+jura_west,jura_west_p1,Jura West (Genfersee–Vallée de Joux),Jura West (Genfersee–Vallée de Joux) - P1,46.994327,6.587562,1200,Jura,"Südwestexponierte Kreten-Thermik, oft frühe Ablösung",Eigenständiges Juraketten-System,Lange Linienflüge entlang Kreten
+jura_west,jura_west_p2,Jura West (Genfersee–Vallée de Joux),Jura West (Genfersee–Vallée de Joux) - P2,46.997002,6.413767,1200,Jura,"Südwestexponierte Kreten-Thermik, oft frühe Ablösung",Eigenständiges Juraketten-System,Lange Linienflüge entlang Kreten
+jura_west,jura_west_p3,Jura West (Genfersee–Vallée de Joux),Jura West (Genfersee–Vallée de Joux) - P3,46.997002,6.853084,1200,Jura,"Südwestexponierte Kreten-Thermik, oft frühe Ablösung",Eigenständiges Juraketten-System,Lange Linienflüge entlang Kreten
+jura_zentral,jura_zentral_p1,Jura Zentral (Chasseral–Weissenstein),Jura Zentral (Chasseral–Weissenstein) - P1,47.248388,7.24902,1280,Jura,"Klassische Jurasüdfuss-Thermik, Bise-anfällig",Getrenntes Windsystem bei Bise,Konvergenzlinien bei Westwind
+jura_zentral,jura_zentral_p2,Jura Zentral (Chasseral–Weissenstein),Jura Zentral (Chasseral–Weissenstein) - P2,47.257912,7.175652,1280,Jura,"Klassische Jurasüdfuss-Thermik, Bise-anfällig",Getrenntes Windsystem bei Bise,Konvergenzlinien bei Westwind
+jura_ost,jura_ost_p1,Jura Ost (Randen–Schaffhausen),Jura Ost (Randen–Schaffhausen) - P1,47.414035,7.456755,900,Jura,"Kühlere Nordostlage, spätere Thermik",Nähe Bodensee verändert Luftmasse,Kombi aus Flachland- und Hangthermik
+jura_ost,jura_ost_p2,Jura Ost (Randen–Schaffhausen),Jura Ost (Randen–Schaffhausen) - P2,47.421445,7.203879,900,Jura,"Kühlere Nordostlage, spätere Thermik",Nähe Bodensee verändert Luftmasse,Kombi aus Flachland- und Hangthermik
+jura_ost,jura_ost_p3,Jura Ost (Randen–Schaffhausen),Jura Ost (Randen–Schaffhausen) - P3,47.421445,7.737384,900,Jura,"Kühlere Nordostlage, spätere Thermik",Nähe Bodensee verändert Luftmasse,Kombi aus Flachland- und Hangthermik
+schwarzsee_gantrisch,schwarzsee_gantrisch_p1,Schwarzsee / Gantrisch,Schwarzsee / Gantrisch - P1,46.681084,7.086988,1500,Voralpen,,,
+schwarzsee_gantrisch,schwarzsee_gantrisch_p2,Schwarzsee / Gantrisch,Schwarzsee / Gantrisch - P2,46.678513,7.006278,1500,Voralpen,,,
+berner_oberland,berner_oberland_p1,Berner Oberland,Berner Oberland - P1,46.858599,7.683016,1800,Hochalpen,,,
+berner_oberland,berner_oberland_p2,Berner Oberland,Berner Oberland - P2,46.887739,7.581372,1800,Hochalpen,,,
+berner_oberland,berner_oberland_p3,Berner Oberland,Berner Oberland - P3,46.887739,7.822866,1800,Hochalpen,,,
+seeland_emmental,seeland_emmental_p1,Seeland / Emmental,Seeland / Emmental - P1,47.143173,7.632739,940,Mittelland,,,
+seeland_emmental,seeland_emmental_p2,Seeland / Emmental,Seeland / Emmental - P2,47.13671,7.350191,940,Mittelland,,,
+seeland_emmental,seeland_emmental_p3,Seeland / Emmental,Seeland / Emmental - P3,47.13671,7.749693,940,Mittelland,,,
+zentrales_mittelland,zentrales_mittelland_p1,Zentrales Mittelland,Zentrales Mittelland - P1,47.025847,8.073542,1400,Mittelland,"Hügelthermik (Napf), Talwind-Sog Richtung Alpen",Übergangszone Alpines Pumpen,Gute Low-Level XC Tage
+zentrales_mittelland,zentrales_mittelland_p2,Zentrales Mittelland,Zentrales Mittelland - P2,47.056553,8.691454,1400,Mittelland,"Hügelthermik (Napf), Talwind-Sog Richtung Alpen",Übergangszone Alpines Pumpen,Gute Low-Level XC Tage
+haslital_grimsel,haslital_grimsel_p1,Haslital–Grimsel,Haslital–Grimsel - P1,47.390432,8.233751,2200,Nordalpen,Starke Talwindbeschleunigung,Grimsel-Pass trennt Systeme,Konvergenzen Nord–Süd
+haslital_grimsel,haslital_grimsel_p2,Haslital–Grimsel,Haslital–Grimsel - P2,47.372027,8.120304,2200,Nordalpen,Starke Talwindbeschleunigung,Grimsel-Pass trennt Systeme,Konvergenzen Nord–Süd
+haslital_grimsel,haslital_grimsel_p3,Haslital–Grimsel,Haslital–Grimsel - P3,47.372027,8.446951,2200,Nordalpen,Starke Talwindbeschleunigung,Grimsel-Pass trennt Systeme,Konvergenzen Nord–Süd
+oestliches_mittelland,oestliches_mittelland_p1,Östliches Mittelland,Östliches Mittelland - P1,47.294175,8.696564,730,Mittelland,"Bise-dominiert, trockener",Eigenständige Windachse,Lange Gleitpassagen
+oestliches_mittelland,oestliches_mittelland_p2,Östliches Mittelland,Östliches Mittelland - P2,47.289626,8.637716,730,Mittelland,"Bise-dominiert, trockener",Eigenständige Windachse,Lange Gleitpassagen
+suedbuenden,suedbuenden_p1,Südbünden (Misox/Bergell),Südbünden (Misox/Bergell) - P1,47.636249,9.062867,1500,Alpensüdflanke,Föhn- & Südstau-Zone,Übergangsraum Italien,Kombination Süd-/Nordregime
+suedbuenden,suedbuenden_p2,Südbünden (Misox/Bergell),Südbünden (Misox/Bergell) - P2,47.616631,8.789269,1500,Alpensüdflanke,Föhn- & Südstau-Zone,Übergangsraum Italien,Kombination Süd-/Nordregime
+suedbuenden,suedbuenden_p3,Südbünden (Misox/Bergell),Südbünden (Misox/Bergell) - P3,47.616631,9.374786,1500,Alpensüdflanke,Föhn- & Südstau-Zone,Übergangsraum Italien,Kombination Süd-/Nordregime

@@ -857,6 +857,10 @@
                 <div class="summary-badge" id="summary-badge">
                     <span id="summary-text">Lade Daten...</span>
                 </div>
+                <div class="summary-badge" id="thermal-badge"
+                    style="display:none; background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%); border-color: #F59E0B;">
+                    <span id="thermal-text"></span>
+                </div>
             </div>
         </div>
 
@@ -899,6 +903,7 @@
         let hoursData = [];
         let activeHourIndex = null;
         let evaluationsData = null;
+        let thermalApiData = null;  // Thermik-Daten aus /api/weather
 
         // Lade Wetterdaten
         async function loadWeatherData() {
@@ -1021,6 +1026,23 @@
                 } catch (evalError) {
                     console.warn('[WARNUNG] Fehler beim Laden der Evaluierungen:', evalError);
                     // Evaluierungen sind optional, fahre fort
+                }
+
+                // Lade auch Thermik-Daten aus /api/weather (enthält berechnete Steigraten)
+                updateStatus('Lade Thermik-Berechnung...');
+                try {
+                    const thermalResponse = await fetch('/api/weather', { cache: 'no-cache' });
+                    if (thermalResponse.ok) {
+                        thermalApiData = await thermalResponse.json();
+                        console.log('[DEBUG] Thermik-API geladen:', thermalApiData?.thermal_overview);
+
+                        // Zeige Thermik-Badge
+                        if (thermalApiData?.thermal_overview) {
+                            displayThermalBadge(thermalApiData.thermal_overview, currentDate);
+                        }
+                    }
+                } catch (thermalError) {
+                    console.warn('[WARNUNG] Thermik-API nicht verfügbar:', thermalError);
                 }
 
                 const summary = generateSummary(firstDay.hours);
@@ -1160,6 +1182,45 @@
             }
 
             return { text, type };
+        }
+
+        function displayThermalBadge(thermalOverview, date) {
+            const badge = document.getElementById('thermal-badge');
+            const textEl = document.getElementById('thermal-text');
+            if (!badge || !textEl) return;
+
+            // Finde den passenden Tag
+            let dayData = null;
+            for (const [key, val] of Object.entries(thermalOverview)) {
+                if (date && key === date) { dayData = val; break; }
+            }
+            // Fallback: erster Tag
+            if (!dayData) dayData = Object.values(thermalOverview)[0];
+            if (!dayData) return;
+
+            const climb = dayData.peak_climb || 0;
+            const rating = dayData.peak_rating || 0;
+            const bestHour = dayData.best_hour;
+            const bestHourStr = bestHour ? new Date(bestHour).getHours() + ':00' : '';
+
+            // Farbe basierend auf climb rate
+            if (climb >= 2.0) {
+                badge.style.background = 'linear-gradient(135deg, #D1FAE5 0%, #6EE7B7 100%)';
+                badge.style.borderColor = '#10B981';
+            } else if (climb >= 1.0) {
+                badge.style.background = 'linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%)';
+                badge.style.borderColor = '#F59E0B';
+            } else if (climb > 0) {
+                badge.style.background = 'linear-gradient(135deg, #FEF3C7 0%, #FEF9C3 100%)';
+                badge.style.borderColor = '#EAB308';
+            } else {
+                badge.style.background = 'linear-gradient(135deg, #F3F4F6 0%, #E5E7EB 100%)';
+                badge.style.borderColor = '#9CA3AF';
+            }
+
+            const stars = rating >= 8 ? '🔥' : rating >= 5 ? '☀️' : rating >= 3 ? '⛅' : '☁️';
+            textEl.innerHTML = `${stars} Thermik: <strong>${climb.toFixed(1)} m/s</strong> (${rating}/10)${bestHourStr ? ' · Beste Stunde: ' + bestHourStr : ''}`;
+            badge.style.display = '';
         }
 
         function displayEvaluation(evaluation, lastUpdated) {
@@ -1347,86 +1408,71 @@
             const chartDiv = document.createElement('div');
             chartDiv.className = 'chart-container';
 
-            // Berechne Steigraten
-            const liftRates = hours.map(h => {
-                const cape = h.data.cape || 0;
-                const sunshine = h.data.sunshine_duration || 0;
-                let liftRate = 0;
-                if (cape > 500) {
-                    liftRate = 2.5 + (cape - 500) / 1000;
-                } else if (cape > 200) {
-                    liftRate = 1.0 + (cape - 200) / 1000;
-                } else if (cape > 0) {
-                    liftRate = cape / 500;
-                }
-                if (sunshine > 0) liftRate *= 1.2;
-                return Math.min(5, Math.max(0, liftRate));
-            });
+            // Versuche berechnete Steigraten aus /api/weather zu verwenden
+            let liftRates;
+            let usingCalculated = false;
 
-            const maxValue = Math.max(...liftRates, 1);
-            const avgValue = liftRates.reduce((a, b) => a + b, 0) / liftRates.length;
-
-            const chartHeight = 40;
-            const containerWidth = chartWidth;
-
-            // Berechne Positionen für alle Punkte
-            const points = liftRates.map((rate, i) => {
-                const x = liftRates.length > 1 ? (i / (liftRates.length - 1)) * 100 : 50;
-                const y = chartHeight - (rate / maxValue) * (chartHeight - 10);
-
-                let colorClass = 'thermik-medium';
-                if (rate > 2) colorClass = 'thermik-high';
-                else if (rate < 1) colorClass = 'thermik-low';
-
-                return {
-                    x: x,
-                    y: y,
-                    rate: rate,
-                    colorClass: colorClass,
-                    hour: hours[i].hour,
-                    index: i
-                };
-            });
-
-            // Erstelle Linien-Segmente zwischen Punkten
-            const lineSegments = [];
-            for (let i = 0; i < points.length - 1; i++) {
-                const p1 = points[i];
-                const p2 = points[i + 1];
-                const dx = p2.x - p1.x;
-                const dy = p2.y - p1.y;
-                // Berechne Länge in Pixeln basierend auf Container-Breite
-                const lengthPx = Math.sqrt((dx * containerWidth / 100) ** 2 + dy ** 2);
-                const angle = Math.atan2(dy, dx * containerWidth / 100) * 180 / Math.PI;
-
-                lineSegments.push({
-                    left: p1.x + '%',
-                    top: p1.y + 'px',
-                    width: lengthPx + 'px',
-                    angle: angle
+            if (thermalApiData && thermalApiData.days && currentDate && thermalApiData.days[currentDate]) {
+                const dayThermik = thermalApiData.days[currentDate].thermik || [];
+                // Mappe berechnete Steigraten zu den Stunden
+                liftRates = hours.map(h => {
+                    const hourStr = String(h.hour).padStart(2, '0');
+                    const match = dayThermik.find(t => {
+                        try {
+                            const tHour = new Date(t.time).getHours();
+                            return tHour === h.hour;
+                        } catch (e) { return false; }
+                    });
+                    return match ? (match.climb_rate || 0) : 0;
+                });
+                usingCalculated = true;
+            } else {
+                // Fallback: Einfache CAPE-Schätzung
+                liftRates = hours.map(h => {
+                    const cape = h.data.cape || 0;
+                    let liftRate = 0;
+                    if (cape > 500) liftRate = 2.5 + (cape - 500) / 1000;
+                    else if (cape > 200) liftRate = 1.0 + (cape - 200) / 1000;
+                    else if (cape > 0) liftRate = cape / 500;
+                    const sunshine = h.data.sunshine_duration || 0;
+                    if (sunshine > 0) liftRate *= 1.2;
+                    return Math.min(5, Math.max(0, liftRate));
                 });
             }
 
+            const maxValue = Math.max(...liftRates, 0.5);
+            const avgValue = liftRates.reduce((a, b) => a + b, 0) / liftRates.length;
+            const peakValue = Math.max(...liftRates);
+
+            const chartHeight = 50;
+            const containerWidth = chartWidth;
+
+            // Erstelle Balken (XC Therm Stil) statt Linien
             chartDiv.innerHTML = `
                 <div class="chart-header">
-                    <div class="chart-title">☀️ Thermik</div>
-                    <div class="chart-value">Ø ${avgValue.toFixed(1)} m/s</div>
-                </div>
-                <div class="html-chart-container" style="width: ${containerWidth}px;">
-                    <div class="html-chart-area" style="height: ${chartHeight}px; margin-bottom: 25px;">
-                        ${lineSegments.map(seg => `
-                            <div class="html-chart-line-segment" 
-                                 style="left: ${seg.left}; top: ${seg.top}; width: ${seg.width}; transform: rotate(${seg.angle}deg); background: #F59E0B;"></div>
-                        `).join('')}
-                        ${points.map(p => `
-                            <div class="html-chart-point ${p.colorClass} chart-highlight" 
-                                 style="left: ${p.x}%; top: ${p.y}px;" 
-                                 data-hour-index="${p.index}"></div>
-                        `).join('')}
-                        ${points.map(p => `
-                            <div class="html-chart-label" style="left: ${p.x}%; top: ${chartHeight + 5}px;">${p.hour}:00</div>
-                        `).join('')}
+                    <div class="chart-title">☀️ Thermik ${usingCalculated ? '(berechnet)' : '(CAPE-Schätzung)'}</div>
+                    <div class="chart-value" style="display:flex; gap:12px; align-items:center;">
+                        <span>Peak: <strong>${peakValue.toFixed(1)}</strong> m/s</span>
+                        <span>Ø ${avgValue.toFixed(1)} m/s</span>
                     </div>
+                </div>
+                <div class="bar-chart-container" style="width: ${containerWidth}px; height: ${chartHeight + 20}px; align-items: flex-end;">
+                    ${hours.map((h, i) => {
+                const rate = liftRates[i];
+                const height = maxValue > 0 ? (rate / maxValue) * 100 : 0;
+                // Farbe: grau → gelb → orange → rot
+                let color;
+                if (rate >= 2.5) color = '#EF4444';
+                else if (rate >= 1.5) color = '#F97316';
+                else if (rate >= 0.8) color = '#EAB308';
+                else if (rate > 0) color = '#FDE047';
+                else color = '#E5E7EB';
+                return `<div style="flex:1; display:flex; flex-direction:column; align-items:center; min-width:30px;">
+                            <div style="font-size:10px; font-weight:700; color:${rate > 0 ? '#374151' : '#9CA3AF'}; margin-bottom:2px;">${rate > 0 ? rate.toFixed(1) : ''}</div>
+                            <div style="width:80%; height:${Math.max(height, 4)}%; background:${color}; border-radius:4px 4px 0 0; transition:height 0.3s;" title="${h.hour}:00 — ${rate.toFixed(1)} m/s"></div>
+                            <div style="font-size:9px; color:#6B7280; font-weight:600; margin-top:2px;">${h.hour}:00</div>
+                        </div>`;
+            }).join('')}
                 </div>
             `;
 

@@ -4,7 +4,7 @@
     "description": "Wetterdaten für Gleitschirmflug-Standorte",
     "main": "web.py",
     "scripts": {
-        "dev": "python web.py",
+        "dev": "concurrently \"python web.py\" \"mkdocs serve\"",
         "fetch": "python fetch_weather.py",
         "evaluate": "python location_evaluator.py",
         "test": "python test_email_connection.py"
@@ -13,5 +13,8 @@
     "license": "ISC",
     "dependencies": {
         "plotly.js-dist": "^3.4.0"
+    },
+    "devDependencies": {
+        "concurrently": "^9.2.1"
     }
 }

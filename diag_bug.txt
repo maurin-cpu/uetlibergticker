@@ -1,0 +1,63 @@
+
+--- 2026-03-05T09:00 ---
+Climb Rate: 0.0 m/s | Max Height: 875m
+H flux: 59.9 W/m2 (estimated: False)
+w* Parcel: 0.0 | w* Deardorff: 0.65
+Limiting factor: inversion_stability | BLH: 145
+Warnings: ["H gesch\u00e4tzt: 60 W/m\u00b2 (dir=96, diff=80) | Topo-Bonus: 0.92x (nur Direkts.) | Veg-Faktor: 1.00x", "Solar-\u00dcberhitzung: \u0394T=0.4\u00b0C (H=60 W/m\u00b2) \u2192 Parcel-BLH=0m AGL", "BLH-Fallback: Parcel fand keine Instabilit\u00e4t, nutze Modell-BLH=145m AGL"]
+
+--- 2026-03-05T10:00 ---
+Climb Rate: 0.5 m/s | Max Height: 1010m
+H flux: 140.0 W/m2 (estimated: False)
+w* Parcel: 0.0 | w* Deardorff: 1.08
+Limiting factor: inversion_stability | BLH: 280
+Warnings: ["H gesch\u00e4tzt: 140 W/m\u00b2 (dir=228, diff=101) | Topo-Bonus: 1.12x (nur Direkts.) | Veg-Faktor: 1.00x", "Solar-\u00dcberhitzung: \u0394T=0.9\u00b0C (H=140 W/m\u00b2) \u2192 Parcel-BLH=0m AGL", "BLH-Fallback: Parcel fand keine Instabilit\u00e4t, nutze Modell-BLH=280m AGL"]
+
+--- 2026-03-05T11:00 ---
+Climb Rate: 0.0 m/s | Max Height: 832m
+H flux: 221.2 W/m2 (estimated: False)
+w* Parcel: 1.36 | w* Deardorff: 0.89
+Limiting factor: solar_energy | BLH: 405
+Warnings: ["H gesch\u00e4tzt: 221 W/m\u00b2 (dir=332, diff=120) | Topo-Bonus: 1.28x (nur Direkts.) | Veg-Faktor: 1.00x", "Solar-\u00dcberhitzung: \u0394T=1.5\u00b0C (H=221 W/m\u00b2) \u2192 Parcel-BLH=102m AGL"]
+
+--- 2026-03-05T12:00 ---
+Climb Rate: 1.9 m/s | Max Height: 1255m
+H flux: 280.2 W/m2 (estimated: False)
+w* Parcel: 5.19 | w* Deardorff: 1.67
+Limiting factor: solar_energy | BLH: 525
+Warnings: ["H gesch\u00e4tzt: 280 W/m\u00b2 (dir=375, diff=151) | Topo-Bonus: 1.44x (nur Direkts.) | Veg-Faktor: 1.00x", "Solar-\u00dcberhitzung: \u0394T=1.9\u00b0C (H=280 W/m\u00b2) \u2192 Parcel-BLH=99m AGL", "BLH-Fallback: Parcel fand keine Instabilit\u00e4t, nutze Modell-BLH=525m AGL"]
+
+--- 2026-03-05T13:00 ---
+Climb Rate: 2.2 m/s | Max Height: 1345m
+H flux: 332.8 W/m2 (estimated: False)
+w* Parcel: 6.68 | w* Deardorff: 1.86
+Limiting factor: solar_energy | BLH: 615
+Warnings: ["H gesch\u00e4tzt: 333 W/m\u00b2 (dir=402, diff=160) | Topo-Bonus: 1.62x (nur Direkts.) | Veg-Faktor: 1.00x", "Solar-\u00dcberhitzung: \u0394T=2.2\u00b0C (H=333 W/m\u00b2) \u2192 Parcel-BLH=95m AGL", "BLH-Fallback: Parcel fand keine Instabilit\u00e4t, nutze Modell-BLH=615m AGL"]
+
+--- 2026-03-05T14:00 ---
+Climb Rate: 1.4 m/s | Max Height: 1048m
+H flux: 360.8 W/m2 (estimated: False)
+w* Parcel: 3.58 | w* Deardorff: 1.53
+Limiting factor: solar_energy | BLH: 650
+Warnings: ["H gesch\u00e4tzt: 361 W/m\u00b2 (dir=381, diff=159) | Topo-Bonus: 1.87x (nur Direkts.) | Veg-Faktor: 1.00x", "Solar-\u00dcberhitzung: \u0394T=2.4\u00b0C (H=361 W/m\u00b2) \u2192 Parcel-BLH=318m AGL"]
+
+--- 2026-03-05T15:00 ---
+Climb Rate: 1.5 m/s | Max Height: 1047m
+H flux: 359.4 W/m2 (estimated: False)
+w* Parcel: 3.98 | w* Deardorff: 1.53
+Limiting factor: solar_energy | BLH: 595
+Warnings: ["H gesch\u00e4tzt: 359 W/m\u00b2 (dir=306, diff=156) | Topo-Bonus: 2.33x (nur Direkts.) | Veg-Faktor: 1.00x", "Solar-\u00dcberhitzung: \u0394T=2.4\u00b0C (H=359 W/m\u00b2) \u2192 Parcel-BLH=317m AGL"]
+
+--- 2026-03-05T16:00 ---
+Climb Rate: 1.4 m/s | Max Height: 1045m
+H flux: 293.9 W/m2 (estimated: False)
+w* Parcel: 3.63 | w* Deardorff: 1.42
+Limiting factor: solar_energy | BLH: 530
+Warnings: ["H gesch\u00e4tzt: 294 W/m\u00b2 (dir=235, diff=118) | Topo-Bonus: 2.50x (nur Direkts.) | Veg-Faktor: 1.00x", "Solar-\u00dcberhitzung: \u0394T=2.0\u00b0C (H=294 W/m\u00b2) \u2192 Parcel-BLH=315m AGL"]
+
+--- 2026-03-05T17:00 ---
+Climb Rate: 0.0 m/s | Max Height: 815m
+H flux: 85.7 W/m2 (estimated: False)
+w* Parcel: 1.29 | w* Deardorff: 0.61
+Limiting factor: solar_energy | BLH: 10
+Warnings: ["H gesch\u00e4tzt: 86 W/m\u00b2 (dir=151, diff=71) | Topo-Bonus: 1.00x (nur Direkts.) | Veg-Faktor: 1.00x", "Solar-\u00dcberhitzung: \u0394T=0.6\u00b0C (H=86 W/m\u00b2) \u2192 Parcel-BLH=85m AGL"]

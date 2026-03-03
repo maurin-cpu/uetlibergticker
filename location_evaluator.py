@@ -284,7 +284,21 @@ class LocationEvaluator:
                     elevation_m=850.0,
                     pressure_levels_data=p_levels,
                     boundary_layer_height_agl=data.get('boundary_layer_height'),
-                    sunshine_duration_s=data.get('sunshine_duration')
+                    sunshine_duration_s=data.get('sunshine_duration'),
+                    shortwave_radiation=data.get('shortwave_radiation'),
+                    direct_radiation=data.get('direct_radiation'),
+                    diffuse_radiation=data.get('diffuse_radiation'),
+                    soil_moisture=data.get('soil_moisture_0_to_1cm'),
+                    soil_temperature=data.get('soil_temperature_0cm'),
+                    updraft=data.get('updraft'),
+                    et0=data.get('et0_fao_evapotranspiration'),
+                    vpd=data.get('vapour_pressure_deficit'),
+                    lifted_index=data.get('lifted_index'),
+                    convective_inhibition=data.get('convective_inhibition'),
+                    snow_depth=data.get('snow_depth'),
+                    timestamp=timestamp,
+                    slope_azimuth=config.LOCATION.get('slope_azimuth'),
+                    slope_angle=config.LOCATION.get('slope_angle'),
                 )
                 
                 if 'error' not in therm:
@@ -293,6 +307,17 @@ class LocationEvaluator:
                     lcl = therm.get('lcl')
                     lcl_str = f", LCL/Basis {lcl}m" if lcl else ""
                     thermal_info = f" | THERMIK-PROXY: {climb} m/s bis {max_h}m MSL{lcl_str} (Güte: {therm['rating']}/10)"
+                    # Erweiterte Diagnostik für LLM-Kontext
+                    diag = therm.get('diagnostics', {})
+                    sm_val = diag.get('soil_moisture')
+                    li_val = diag.get('lifted_index')
+                    cin_val = diag.get('convective_inhibition')
+                    if sm_val is not None:
+                        thermal_info += f" | Bodenfeuchte: {sm_val:.2f}"
+                    if li_val is not None:
+                        thermal_info += f" | LI: {li_val:.1f}"
+                    if cin_val is not None:
+                        thermal_info += f" | CIN: {cin_val:.0f} J/kg"
             except Exception as e:
                 thermal_info = f" | Thermik-Fehler: {e}"
             

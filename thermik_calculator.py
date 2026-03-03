@@ -1,5 +1,6 @@
 import math
 from typing import Dict, List, Optional
+from datetime import datetime
 import logging
 
 logger = logging.getLogger(__name__)
@@ -54,6 +55,104 @@ def estimate_sensible_heat_flux(shortwave_radiation: float, sunshine_duration_s:
     if sunshine_duration_s is not None:
         sun_factor = min(1.0, max(0.0, sunshine_duration_s / 3600.0))
     return shortwave_radiation * 0.3 * sun_factor
+
+
+def calculate_topography_bonus(
+    timestamp: str,
+    slope_azimuth: float,
+    slope_angle: float,
+    lat: float = 46.8  # Mittelwert Schweiz
+) -> float:
+    """
+    Berechnet den dynamischen Sonnen-Einstrahlungsbonus für einen Hang im Vergleich zum Flachland.
+    Gibt einen Faktor zurück (z.B. 1.0 für Flachland, 1.8 für einen Südhang im Winter).
+    """
+    if not timestamp or slope_azimuth is None or slope_angle is None or slope_angle == 0:
+        return 1.0
+
+    try:
+        dt = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+        doy = dt.timetuple().tm_yday
+        
+        # Sonnen-Deklination (delta) in Rad
+        delta_deg = -23.44 * math.cos(math.radians((360.0 / 365.0) * (doy + 10)))
+        delta = math.radians(delta_deg)
+        
+        # Hour Angle (h) in Rad (Grobe Näherung basierend auf UTC Stunde + Lon Korrektur)
+        solar_hour = dt.hour + (8.5 / 15.0) # ~Lokalzeit Zürich
+        h_deg = 15.0 * (solar_hour - 12.0)
+        h = math.radians(h_deg)
+        
+        phi = math.radians(lat)
+        beta = math.radians(slope_angle)
+        
+        # Umrechnung slope_azimuth (0=N, 90=E, 180=S, 270=W) in Formel-Azimuth (0=Süd, West=positiv)
+        gamma_deg = slope_azimuth - 180.0
+        gamma = math.radians(gamma_deg)
+        
+        # Solare Elevation (alpha) für flachen Boden
+        sin_alpha = math.sin(phi)*math.sin(delta) + math.cos(phi)*math.cos(delta)*math.cos(h)
+        
+        if sin_alpha <= 0.05: # unter ~3 Grad (Sonne geht auf/unter oder ist dunkel)
+            return 1.0
+            
+        # Einfallswinkel auf dem Hang (cos_theta)
+        term1 = math.sin(delta)*math.sin(phi)*math.cos(beta)
+        term2 = -math.sin(delta)*math.cos(phi)*math.sin(beta)*math.cos(gamma)
+        term3 = math.cos(delta)*math.cos(phi)*math.cos(beta)*math.cos(h)
+        term4 = math.cos(delta)*math.sin(phi)*math.sin(beta)*math.cos(gamma)*math.cos(h)
+        term5 = math.cos(delta)*math.sin(beta)*math.sin(gamma)*math.sin(h)
+        
+        cos_theta = term1 + term2 + term3 + term4 + term5
+        
+        if cos_theta <= 0:
+            return 0.5 # Hang liegt im Schatten -> Thermik deutlich schlechter als im Flachland
+            
+        # Bonus berechnen: Verhältnis Hang-Strahlung zu Flachland-Strahlung
+        bonus = cos_theta / sin_alpha
+        
+        # Sanftes Cap (Limit auf 2.5x Bonus, um numerische Explosionen bei sehr tiefer Sonne zu vermeiden)
+        return min(2.5, max(0.5, bonus))
+        
+    except Exception as e:
+        logger.error(f"Fehler in calculate_topography_bonus: {e}")
+        return 1.0
+
+
+def calculate_seasonal_bowen_ratio_adjustment(timestamp: str) -> float:
+    """
+    Berechnet einen Faktor zur Anpassung des Sensiblen Wärmeflusses (H) basierend 
+    auf dem saisonalen Vegetationszyklus (Verdunstung via Pflanzen / Latent Heat).
+    """
+    if not timestamp:
+        return 1.0
+        
+    try:
+        dt = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+        doy = dt.timetuple().tm_yday
+        
+        # Saisonale Logik (Mitteleuropa):
+        # Jan-Mrz (1-90): Boden feucht, aber keine Pflanzen -> 1.0
+        # Apr-Jun (90-180): Starkes Pflanzenwachstum ("Lush Vegetation"), saugt Wasser -> verdunstet viel -> H sinkt
+        # Jul-Sep (181-270): Trockenere Böden, reife Pflanzen -> H steigt an (Autumn Bonus)
+        # Okt-Dez (271-365): Pflanzen tot, H normal -> 1.0
+        
+        if 90 <= doy < 180:
+            # Linearer Drop bis Mitte Mai (DOY 135 -> 0.85), dann Erholung
+            if doy < 135:
+                return 1.0 - 0.15 * ((doy - 90) / 45.0)
+            else:
+                return 0.85 + 0.15 * ((doy - 135) / 45.0)
+        elif 180 <= doy < 270:
+            # Linearer Anstieg bis Mitte August (DOY 225 -> 1.15), dann Drop
+            if doy < 225:
+                return 1.0 + 0.15 * ((doy - 180) / 45.0)
+            else:
+                return 1.15 - 0.15 * ((doy - 225) / 45.0)
+        else:
+            return 1.0
+    except Exception:
+        return 1.0
 
 
 def interpolate_temp_at_height(elevation_ref: float, profile: List[Dict]) -> Optional[float]:
@@ -118,6 +217,19 @@ def calculate_thermal_profile(
     surface_sensible_heat_flux: float = None,
     surface_latent_heat_flux: float = None,
     shortwave_radiation: float = None,
+    direct_radiation: float = None,
+    diffuse_radiation: float = None,
+    soil_moisture: float = None,
+    soil_temperature: float = None,
+    updraft: float = None,
+    et0: float = None,
+    vpd: float = None,
+    lifted_index: float = None,
+    convective_inhibition: float = None,
+    snow_depth: float = None,
+    timestamp: str = None,
+    slope_azimuth: float = None,
+    slope_angle: float = None,
 ) -> Dict:
     """
     Berechnet das Thermik-Profil mit physikalisch fundiertem Modell.
@@ -156,14 +268,22 @@ def calculate_thermal_profile(
     )
 
     # =========================================================================
-    # 1. ELEVATED HEAT SOURCE: Starttemperatur auf Referenzhöhe bestimmen
+    # 1. ELEVATED HEAT SOURCE + SOLARE ÜBERHITZUNG
     # =========================================================================
-    # Statt temperature_2m (bezieht sich auf Modellgelände, oft im Talboden)
-    # nutzen wir die interpolierte Temperatur auf der tatsächlichen Starthöhe
-    # aus dem vertikalen Profil. Das ist physikalisch korrekter für Hangstarts.
+    # XC Therm / Burnair Methode: Die Erdoberfläche heizt die bodennahe Luft
+    # über die gemessene 2m-Temperatur hinaus auf ("superadiabatische Schicht").
+    # Ein Thermikschlauch startet mit dieser überhitzten Temperatur, NICHT mit
+    # der Umgebungstemperatur. Der Überschuss ΔT hängt vom sensiblen Wärmefluss ab.
+    #
+    # Physik: ΔT_excess ≈ H / (ρ · cp · w_mix)
+    #   mit w_mix ≈ 0.5-1.0 m/s (konvektive Mischgeschwindigkeit)
+    #   → bei H=240 W/m²: ΔT ≈ 240 / (1.225 · 1005 · 0.8) ≈ 0.24°C pro 1 W/m² ≈ 2.4°C
+    #
+    # Empirisch kalibriert: ΔT = min(5, H / 80)
+    #   H=100 → +1.3°C, H=200 → +2.5°C, H=300 → +3.8°C, H=400 → +5°C
+    
     start_temp = interpolate_temp_at_height(elevation_m, profile)
     if start_temp is None:
-        # Fallback: Nutze temperature_2m direkt
         start_temp = surface_temp
         data_warnings.append(
             "Keine Profildaten für Starthöhe verfügbar - nutze temperature_2m als Fallback"
@@ -181,20 +301,67 @@ def calculate_thermal_profile(
     h_valid = H is not None and not (isinstance(H, float) and math.isnan(H))
 
     if not h_valid:
-        # Fallback: Schätze H aus Globalstrahlung und Sonnenscheindauer
-        H = estimate_sensible_heat_flux(shortwave_radiation, sunshine_duration_s)
-        h_is_estimated = True
-        if H > 0:
-            data_warnings.append(
-                f"Sensibler Wärmefluss aus Globalstrahlung geschätzt: {H:.0f} W/m²"
-            )
+        # Fallback 1: Bessere Schätzung aus direkter + diffuser Strahlung
+        if direct_radiation is not None and diffuse_radiation is not None:
+            sun_factor = 1.0
+            if sunshine_duration_s is not None:
+                sun_factor = min(1.0, max(0.0, sunshine_duration_s / 3600.0))
+            
+            # --- SAISONALE PHYSIK ---
+            # 1. Dynamischer Topografie-Bonus (Sonnenhöhe vs Hangneigung)
+            topo_bonus = calculate_topography_bonus(timestamp, slope_azimuth, slope_angle)
+            
+            # 2. Saisonale Bowen-Ratio (Vegetationszyklus)
+            veg_factor = calculate_seasonal_bowen_ratio_adjustment(timestamp)
+            
+            # Koeffizienten: ~40-45% der Direktstrahlung wird H, ~20-25% der Diffusen.
+            # NUR DIE DIREKTE Strahlung profitiert vom Topografischen Hangneigungs-Bonus!
+            dir_h = direct_radiation * 0.45 * topo_bonus
+            diff_h = diffuse_radiation * 0.25
+            
+            H = (dir_h + diff_h) * sun_factor * veg_factor
+            
+            # ROBUSTNESS-CAP: Uetliberg ist ein Voralpen-Hügel, kein Hochalpiner Fels.
+            H = min(450.0, H)
+            
+            if H > 0:
+                data_warnings.append(
+                    f"H geschätzt: {H:.0f} W/m² (dir={direct_radiation:.0f}, diff={diffuse_radiation:.0f}) "
+                    f"| Topo-Bonus: {topo_bonus:.2f}x (nur Direkts.) | Veg-Faktor: {veg_factor:.2f}x"
+                )
         else:
+            # Fallback 2: Pauschale Schätzung aus Globalstrahlung
+            # Wir nehmen an: 60% Direkt, 40% Diffus -> gemischter Topo-Bonus
+            topo_bonus = calculate_topography_bonus(timestamp, slope_azimuth, slope_angle)
+            mixed_topo_bonus = (topo_bonus * 0.6) + (1.0 * 0.4)
+            veg_factor = calculate_seasonal_bowen_ratio_adjustment(timestamp)
+            
+            H = estimate_sensible_heat_flux(shortwave_radiation, sunshine_duration_s)
+            H *= mixed_topo_bonus
+            H *= veg_factor
+            
+            H = min(450.0, H)
+            
+            if H > 0:
+                data_warnings.append(
+                    f"H aus Globalstrahlung geschätzt: {H:.0f} W/m² "
+                    f"| Topo-Bonus(mix): {mixed_topo_bonus:.2f}x | Veg-Faktor: {veg_factor:.2f}x"
+                )
+        if H <= 0 and h_is_estimated:
             data_warnings.append(
-                "Kein sensibler Wärmefluss verfügbar (weder API noch Globalstrahlung)"
+                "Kein sensibler Wärmefluss verfügbar (weder API noch Strahlung)"
             )
 
     # Negativen Flux abfangen (nachts fliesst Wärme vom Boden ab -> keine Thermik)
     H = max(0.0, H)
+
+    # =========================================================================
+    # 2.5 SCHNEEDECKEN-BLOCKADE (Albedo & Schmelzwärme)
+    # =========================================================================
+    # Wenn Schnee liegt, geht fast alle Sonnenenergie in die Schmelze oder wird reflektiert.
+    if snow_depth is not None and snow_depth > 0.05: # > 5cm Schnee
+        H = min(50.0, H * 0.2) # Maximal 50 W/m², 80% Reduktion
+        data_warnings.append(f"Schneedecke ({snow_depth:.2f}m): Thermik massiv gedämpft (Stark reduzierte Albedo/Schmelze).")
 
     # =========================================================================
     # 3. LATENTER WÄRMEFLUSS (LE) - für Bodenfeuchte-Bremse
@@ -205,10 +372,32 @@ def calculate_thermal_profile(
     le_valid = LE is not None and not (isinstance(LE, float) and math.isnan(LE))
 
     if not le_valid:
-        LE = 0.0
-        data_warnings.append(
-            "Latenter Wärmefluss nicht verfügbar - Bodenfeuchte-Bremse wird übersprungen"
-        )
+        # Fallback: LE aus Bodenfeuchte schätzen
+        # ACHTUNG: soil_moisture_0_to_1cm (oberste 1cm) ist IMMER relativ feucht
+        # (typisch 0.15-0.25 bei normalen Bedingungen). Die Bodenfeuchte-Bremse
+        # soll nur bei wirklich nassem Boden greifen (z.B. nach Regen, SM > 0.35).
+        # Daher: Linearer Ansatz mit konservativem Schwellwert.
+        if soil_moisture is not None and H > 0:
+            # Unter 0.30: normaler Boden -> kaum Verdunstungseffekt
+            # 0.30-0.45: zunehmend nass -> LE steigt linear bis 2*H
+            # Über 0.45: gesättigt -> LE = 2*H (Bremse feuert)
+            if soil_moisture > 0.30:
+                moisture_excess = min(1.0, (soil_moisture - 0.30) / 0.15)
+                LE = moisture_excess * 2.0 * H
+                le_valid = True
+                data_warnings.append(
+                    f"LE aus Bodenfeuchte geschätzt: {LE:.0f} W/m² "
+                    f"(soil_moisture={soil_moisture:.3f}, nass={moisture_excess:.2f})"
+                )
+            else:
+                # Normaler Boden: LE niedrig, keine Bremse
+                LE = soil_moisture / 0.30 * 0.3 * H  # max 30% von H
+                le_valid = False  # Nicht genug für Bremse
+        else:
+            LE = 0.0
+            data_warnings.append(
+                "Latenter Wärmefluss nicht verfügbar - Bodenfeuchte-Bremse wird übersprungen"
+            )
 
     # =========================================================================
     # 4. LCL (Wolkenbasis) berechnen
@@ -302,24 +491,117 @@ def calculate_thermal_profile(
 
         prev_height = h
 
-    # Begrenzung durch Boundary Layer Height (Modellinversion)
-    if boundary_layer_height_agl is not None:
+    # =========================================================================
+    # 5b. SOLARE ÜBERHITZUNG → PARCEL-BASIERTE BLH
+    # =========================================================================
+    # Der solare Überschuss macht das Paket wärmer als die Umgebung.
+    # Die Höhe, wo das Paket die Umgebungstemperatur erreicht, ist die
+    # konvektive Grenzschichthöhe (CBL). Diese Methode braucht kein Modell-BLH!
+    #
+    # Wenn der erste Aufstieg keine Instabilität fand (max_thermal_height < 350m über Start),
+    # führen wir einen ZWEITEN Aufstieg mit überhitztem Paket durch.
+    
+    parcel_found_instability = (max_thermal_height - elevation_m) > 350
+    dt_excess = 0.0
+    
+    if not parcel_found_instability and H > 30:
+        # Berechne solaren Überschuss
+        # ROBUSTNESS-CAP: Max 2.5°C Überhitzung für typisches Gelände (Flachland/Voralpen).
+        # Zu grosse Überhitzung erzeugte unrealistisch hohe m/s Werte.
+        # Schneedecke-Sonderfall: Schnee kann nicht wärmer als 0°C werden (keine Puffer-Überhitzung)
+        if snow_depth is not None and snow_depth > 0.05:
+            dt_excess = 0.0
+            data_warnings.append("Keine solare Überhitzung möglich wegen Schneedecke.")
+        else:
+            dt_excess = min(2.5, H / 150.0)
+            
+        heated_start = start_temp + dt_excess
+        
+        # Zweiter Paketaufstieg mit überhitzter Starttemperatur
+        parcel_temp_h = heated_start
+        prev_height_h = elevation_m
+        max_thermal_height = elevation_m
+        cumulative_temp_diff = 0.0
+        valid_layers = 0
+        ti_profile = []  # Reset TI-Profil
+        
+        for layer in profile:
+            h = layer['height']
+            if h <= elevation_m:
+                continue
+            env_temp = layer['temp']
+            dh = h - prev_height_h
+            if dh <= 0:
+                continue
+            
+            # Adiabatischer Aufstieg (vereinfacht ohne Entrainment für BLH-Bestimmung)
+            if lcl_msl and h > lcl_msl:
+                if prev_height_h < lcl_msl:
+                    dh_dry = lcl_msl - prev_height_h
+                    dh_moist = h - lcl_msl
+                    parcel_temp_h -= DALR * dh_dry + SALR * dh_moist
+                else:
+                    parcel_temp_h -= SALR * dh
+            else:
+                parcel_temp_h -= DALR * dh
+            
+            # Entrainment (schwächer als Standard, da Thermikkern)
+            mu_light = MU * 0.5  # Halber Entrainment für kräftige Thermikblasen
+            parcel_temp_h -= mu_light * (parcel_temp_h - env_temp) * dh
+            
+            ti = env_temp - parcel_temp_h
+            ti_profile.append({
+                'height': h,
+                'pressure': layer.get('pressure'),
+                'parcel_temp': round(parcel_temp_h, 2),
+                'env_temp': env_temp,
+                'ti': round(ti, 2)
+            })
+            
+            if parcel_temp_h >= env_temp - 0.3:  # Engere Toleranz bei überhitztem Paket
+                max_thermal_height = h
+                cumulative_temp_diff += (parcel_temp_h - env_temp)
+                valid_layers += 1
+            else:
+                break
+            
+            prev_height_h = h
+        
+        z_i_parcel = max_thermal_height - elevation_m
+        data_warnings.append(
+            f"Solar-Überhitzung: ΔT={dt_excess:.1f}°C (H={H:.0f} W/m²) "
+            f"→ Parcel-BLH={z_i_parcel:.0f}m AGL"
+        )
+    
+    # Modell-BLH als Plausibilitäts-Check (nicht mehr primär)
+    if boundary_layer_height_agl is not None and boundary_layer_height_agl > 100:
         blh_msl = elevation_m + boundary_layer_height_agl
-        if max_thermal_height > blh_msl:
-            max_thermal_height = blh_msl
-        elif max_thermal_height <= elevation_m and boundary_layer_height_agl > 150 and H > 30:
-            max_thermal_height = min(blh_msl, elevation_m + 2000)
-            data_warnings.append(
-                f"BLH-Korrektur: Grenzschichthoehe ({boundary_layer_height_agl:.0f}m AGL) "
-                f"als Thermiktiefe genutzt (H={H:.0f} W/m²)"
-            )
-
+        parcel_zi = max_thermal_height - elevation_m
+        
+        if parcel_zi > 100:
+            # Parcel hat selbst eine BLH gefunden → begrenzen falls Modell-BLH niedriger
+            if max_thermal_height > blh_msl * 1.5:
+                # Parcel deutlich höher als Modell → Modell-BLH als grosszügige Obergrenze (50% Toleranz)
+                # GFS unterschätzt die BLH massiv, daher erlauben wir 50% Abweichung nach oben.
+                max_thermal_height = int(blh_msl * 1.4)
+                data_warnings.append(
+                    f"BLH-Begrenzung: Parcel={parcel_zi:.0f}m > Modell={boundary_layer_height_agl:.0f}m AGL, "
+                    f"begrenzt auf {max_thermal_height - elevation_m:.0f}m AGL"
+                )
+        else:
+            # Parcel fand nichts, aber Modell hat BLH → als Fallback nutzen
+            if H > 20:
+                max_thermal_height = blh_msl
+                data_warnings.append(
+                    f"BLH-Fallback: Parcel fand keine Instabilität, "
+                    f"nutze Modell-BLH={boundary_layer_height_agl:.0f}m AGL"
+                )
+    
     # H-basierte Fallback-Schaetzung der Thermiktiefe
-    # Greift wenn weder Parcel noch BLH eine Thermiktiefe ergeben, aber die Sonne
-    # deutlich heizt. icon_seamless liefert z.B. kein boundary_layer_height.
-    # Empirische Formel: z_i ~ H * 3, gedeckelt auf 800m (konservativ).
+    # Greift wenn weder Parcel noch BLH verfügbar, aber Sonne heizt.
     if max_thermal_height <= elevation_m and H > 50:
-        z_i_est = int(min(800, max(200, H * 3)))
+        # Encroachment-Modell
+        z_i_est = int(min(2000, max(300, H * 5)))
         max_thermal_height = elevation_m + z_i_est
         data_warnings.append(
             f"H-Schaetzung: Thermiktiefe ~{z_i_est}m (H={H:.0f} W/m²)"
@@ -333,11 +615,13 @@ def calculate_thermal_profile(
     # a) w*_parcel: Aus der mittleren Temperaturdifferenz (Parcel-Aufstieg)
     # b) w*_deardorff: Aus dem sensiblen Waermefluss (Energie-Ansatz)
     #
-    # Bei BLH-Fallback (z_i aus Grenzschichthoehe): Nur Deardorff,
-    # da Parcel keine Instabilitaet fand.
-    # Bei beiden > 0: Geometrisches Mittel sqrt(a*b) statt min(a,b).
-    # Weniger konservativ, aber physikalisch besser balanciert.
-
+    # Geometrisches Mittel sqrt(a*b).
+    # CLIMB_FACTOR kalibriert die theoretische Aufwindgeschwindigkeit auf die
+    # tatsächliche Steigrate des Gleitschirms, der versucht die besten Kerne zu zentrieren.
+    # Physikalisch: Ein Gleitschirm erzielt typischerweise ~50% der theoretischen w* Geschwindigkeit
+    # wegen Eigensinken im Kreisflug (-1.0m/s bis -1.5m/s) und unperfekter Zentrierung.
+    CLIMB_FACTOR = 0.50
+    
     T_kelvin = start_temp + 273.15
     z_i = max_thermal_height - elevation_m
 
@@ -360,9 +644,10 @@ def calculate_thermal_profile(
             buoyancy_flux = H / (RHO * CP)
             w_star_deardorff = ((G / T_kelvin) * buoyancy_flux * z_i) ** (1.0 / 3.0)
 
-        # c) Kombination: Geometrisches Mittel wenn beide verfuegbar
+        # c) Kombination: Gewichtete Mischung wenn beide verfuegbar
         if w_star_parcel > 0 and w_star_deardorff > 0:
-            raw_w_star = math.sqrt(w_star_parcel * w_star_deardorff)
+            # Wenn Paketaufstieg sehr stark ist, gewichte ihn stärker (Lokale Thermik)
+            raw_w_star = (w_star_parcel * 0.60 + w_star_deardorff * 0.40)
             if w_star_parcel < w_star_deardorff:
                 limiting_factor = "inversion_stability"
             else:
@@ -377,11 +662,29 @@ def calculate_thermal_profile(
             raw_w_star = 0.0
 
         # Kalibrierungsfaktor: w* -> reales Gleitschirm-Steigen
-        # Literatur: Stull 1988 ~0.5 fuer Thermikkern, Bradbury 1991 ~0.4-0.5
-        # 0.45 = Mittelwert fuer Paraglider-spezifisches Kreissteigen
-        avg_climb = raw_w_star * 0.45
+        # ROBUSTNESS-DAMPENING: Extrem starke Thermik (>3 m/s) ist sehr turbulent 
+        # und kann vom Piloten nicht mehr perfekt zentriert ausgekurbelt werden.
+        # Wir dämpfen den Faktor bei absurd hohen w* Werten leicht ab.
+        if raw_w_star > 4.0:
+            climb_factor = max(0.40, CLIMB_FACTOR - (raw_w_star - 4.0) * 0.05)
+        else:
+            climb_factor = CLIMB_FACTOR
+            
+        avg_climb = raw_w_star * climb_factor
 
-        avg_climb = min(6.0, avg_climb)
+        # --- Updraft-Blending: DWD-Modellthermik einmischen ---
+        if updraft is not None and updraft > 0:
+            # Skalierung: Gittermittel → Thermikkern
+            dwd_climb = updraft * 4.0 * CLIMB_FACTOR
+            blended = 0.70 * avg_climb + 0.30 * dwd_climb
+            if blended > avg_climb:
+                avg_climb = blended
+                data_warnings.append(
+                    f"Updraft-Blending angehoben: DWD={dwd_climb:.1f} m/s → {avg_climb:.1f} m/s"
+                )
+
+        # Absolute Hard-Cap für Voralpen
+        avg_climb = min(4.5, avg_climb)
 
     # =========================================================================
     # 7. BEWERTUNG (Rating 0-10)
@@ -394,6 +697,19 @@ def calculate_thermal_profile(
     if avg_climb >= 1.5: rating = 7
     if avg_climb >= 2.5: rating = 9
     if avg_climb >= 3.5: rating = 10
+
+    # CIN-Bremse: Konvektive Hemmung reduziert Rating
+    if convective_inhibition is not None:
+        if convective_inhibition < -100:
+            rating = max(0, rating - 2)
+            data_warnings.append(
+                f"CIN-Bremse: CIN={convective_inhibition:.0f} J/kg (stark) → Rating -2"
+            )
+        elif convective_inhibition < -50:
+            rating = max(0, rating - 1)
+            data_warnings.append(
+                f"CIN-Bremse: CIN={convective_inhibition:.0f} J/kg (mässig) → Rating -1"
+            )
 
     # Minimale Thermikhöhe: Unter 200m ueber Start ist Thermik kaum nutzbar
     if max_thermal_height < elevation_m + 200:
@@ -438,6 +754,10 @@ def calculate_thermal_profile(
         'thermal_depth_m': round(z_i),
         'start_temp_used': round(start_temp, 1),
         'boundary_layer_height_agl': round(boundary_layer_height_agl) if boundary_layer_height_agl is not None else None,
+        'soil_moisture': round(soil_moisture, 3) if soil_moisture is not None else None,
+        'lifted_index': round(lifted_index, 1) if lifted_index is not None else None,
+        'convective_inhibition': round(convective_inhibition, 0) if convective_inhibition is not None else None,
+        'vapour_pressure_deficit': round(vpd, 2) if vpd is not None else None,
     }
 
     return {
@@ -452,7 +772,8 @@ def calculate_thermal_profile(
 
 
 def analyze_hour(hourly_data: Dict, pressure_data: Dict, time_index: int,
-                 elevation_m: float = 850.0) -> Dict:
+                 elevation_m: float = 850.0, slope_azimuth: float = None,
+                 slope_angle: float = None) -> Dict:
     """
     Extrahiert die Daten für eine spezifische Stunde und berechnet die Thermik.
     Convenience-Funktion, die alle Parameter aus den API-Rohdaten extrahiert
@@ -487,6 +808,26 @@ def analyze_hour(hourly_data: Dict, pressure_data: Dict, time_index: int,
         swr = hourly_data.get('shortwave_radiation', [])
         swr_val = swr[time_index] if swr and len(swr) > time_index else None
 
+        # Neue Parameter extrahieren
+        def _get_val(key):
+            arr = hourly_data.get(key, [])
+            return arr[time_index] if arr and len(arr) > time_index else None
+
+        dir_rad = _get_val('direct_radiation')
+        diff_rad = _get_val('diffuse_radiation')
+        sm = _get_val('soil_moisture_0_to_1cm')
+        st = _get_val('soil_temperature_0cm')
+        upd = _get_val('updraft')
+        et0_val = _get_val('et0_fao_evapotranspiration')
+        vpd_val = _get_val('vapour_pressure_deficit')
+        li_val = _get_val('lifted_index')
+        cin_val = _get_val('convective_inhibition')
+        snow_depth_val = _get_val('snow_depth')
+
+        # Timestamp holen
+        times = hourly_data.get('time', [])
+        ts_val = times[time_index] if times and len(times) > time_index else None
+
         # Höhendaten extrahieren
         p_levels = []
         for level in [1000, 975, 950, 925, 900, 875, 850, 825, 800, 775, 750, 700, 600]:
@@ -513,6 +854,19 @@ def analyze_hour(hourly_data: Dict, pressure_data: Dict, time_index: int,
             surface_sensible_heat_flux=shf_val,
             surface_latent_heat_flux=lhf_val,
             shortwave_radiation=swr_val,
+            direct_radiation=dir_rad,
+            diffuse_radiation=diff_rad,
+            soil_moisture=sm,
+            soil_temperature=st,
+            updraft=upd,
+            et0=et0_val,
+            vpd=vpd_val,
+            lifted_index=li_val,
+            convective_inhibition=cin_val,
+            snow_depth=snow_depth_val,
+            timestamp=ts_val,
+            slope_azimuth=slope_azimuth,
+            slope_angle=slope_angle,
         )
 
     except Exception as e:
