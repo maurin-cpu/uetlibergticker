@@ -101,21 +101,7 @@ def evaluate_foehn(
     time_index: Optional[int] = None,
 ) -> dict:
     """
-    Bewertet Föhn-Gefahr für einen Zeitpunkt.
-
-    Returns:
-        {
-            "level": "none" | "caution" | "danger",
-            "label": str,
-            "message": str,
-            "delta_p_hpa": float,
-            "crest_wind_kmh": float,
-            "crest_dir_deg": float,
-            "humidity_nord": float,
-            "gust_ratio": float,
-            "indicators": list,
-            "timestamp": str,
-        }
+    Bewertet Föhn-Gefahr für einen Zeitpunkt unter Berücksichtigung der kritischen Föhnrichtng des Startplatzes.
     """
     h_nord = nord.get("hourly", {})
     h_sued = sued.get("hourly", {})
@@ -148,9 +134,11 @@ def evaluate_foehn(
     wind_700 = get(h_nord.get("wind_speed_700hPa"), time_index)
     dir_700 = get(h_nord.get("wind_direction_700hPa"), time_index)
 
-    delta_p = None
+    delta_p_sued = None
+    delta_p_nord = None
     if p_sued is not None and p_nord is not None:
-        delta_p = round(p_sued - p_nord, 1)
+        delta_p_sued = round(p_sued - p_nord, 1) # Positiv = Südföhn
+        delta_p_nord = round(p_nord - p_sued, 1) # Positiv = Nordföhn
 
     crest_wind = wind_700
     crest_dir = dir_700 if dir_700 is not None else 0
@@ -161,33 +149,76 @@ def evaluate_foehn(
 
     indicators = []
     level = "none"
+    
+    krit_foehn = config.LOCATION.get('kritischer_foehn', 'Süd')
+    
+    is_suedfoehn_active = delta_p_sued is not None and delta_p_sued > 0
+    is_nordfoehn_active = delta_p_nord is not None and delta_p_nord > 0
+    
+    # 1. Druckgradient
+    if is_suedfoehn_active:
+        indicators.append(f"Delta-P (Südföhn): {delta_p_sued} hPa")
+        if delta_p_sued >= THRESHOLD_DELTA_P_CAUTION:
+            msg = f"Südföhn Delta-P >= {THRESHOLD_DELTA_P_CAUTION} hPa"
+            if krit_foehn in ['Süd', 'Beide']:
+                if delta_p_sued >= THRESHOLD_DELTA_P_DANGER:
+                    level = "danger"
+                    indicators.append(f"{msg} -> Flugverbot-Empfehlung")
+                else:
+                    if level != "danger": level = "caution"
+                    indicators.append(f"{msg} -> Vorsicht")
+            else:
+                indicators.append(f"{msg} (für diesen Startplatz nicht kritisch)")
+                
+    elif is_nordfoehn_active:
+        indicators.append(f"Delta-P (Nordföhn): {delta_p_nord} hPa")
+        if delta_p_nord >= THRESHOLD_DELTA_P_CAUTION:
+            msg = f"Nordföhn Delta-P >= {THRESHOLD_DELTA_P_CAUTION} hPa"
+            if krit_foehn in ['Nord', 'Beide']:
+                if delta_p_nord >= THRESHOLD_DELTA_P_DANGER:
+                    level = "danger"
+                    indicators.append(f"{msg} -> Flugverbot-Empfehlung")
+                else:
+                    if level != "danger": level = "caution"
+                    indicators.append(f"{msg} -> Vorsicht")
+            else:
+                indicators.append(f"{msg} (für diesen Startplatz nicht kritisch)")
 
-    # 1. Druckgradient (Südföhn: Süd > Nord)
-    if delta_p is not None:
-        indicators.append(f"Delta-P (Sued-Nord): {delta_p} hPa")
-        if delta_p >= THRESHOLD_DELTA_P_DANGER:
-            level = "danger"
-            indicators.append(f"Delta-P >= {THRESHOLD_DELTA_P_DANGER} hPa -> Flugverbot-Empfehlung")
-        elif delta_p >= THRESHOLD_DELTA_P_CAUTION:
-            if level != "danger":
-                level = "caution"
-            indicators.append(f"Delta-P >= {THRESHOLD_DELTA_P_CAUTION} hPa -> Vorsicht an exponierten Stellen")
-
-    # 2. Höhenwind am Kamm (S/SW für Südföhn)
+    # 2. Höhenwind am Kamm
     if crest_wind is not None:
         indicators.append(f"Höhenwind 700 hPa: {round(crest_wind)} km/h aus {round(crest_dir or 0)}°")
-        if crest_dir is not None and SUEDFOEHN_DIR_START <= crest_dir <= SUEDFOEHN_DIR_END:
-            if crest_wind >= THRESHOLD_CREST_WIND_DANGER:
-                level = "danger"
-                indicators.append(f"Wind am Kamm >= {THRESHOLD_CREST_WIND_DANGER} km/h aus S/SW")
-            elif crest_wind >= THRESHOLD_CREST_WIND_CAUTION:
-                if level != "danger":
-                    level = "caution"
-                indicators.append("Starker Wind am Kamm aus S/SW")
+        
+        is_sued_dir = SUEDFOEHN_DIR_START <= crest_dir <= SUEDFOEHN_DIR_END
+        # Nordföhn Richtung: Nord bis Ost (ca 315° bis 45°)
+        is_nord_dir = crest_dir >= 315 or crest_dir <= 45
+        
+        if is_sued_dir and crest_wind >= THRESHOLD_CREST_WIND_CAUTION:
+            msg = "Starker Wind am Kamm aus S/SW"
+            if krit_foehn in ['Süd', 'Beide']:
+                if crest_wind >= THRESHOLD_CREST_WIND_DANGER:
+                    level = "danger"
+                    indicators.append(f"{msg} (Flugverbot)")
+                else:
+                    if level != "danger": level = "caution"
+                    indicators.append(msg)
+            else:
+                indicators.append(f"{msg} (Schwachwind-Thermik gestört, aber kein Föhn-Risiko)")
+                
+        elif is_nord_dir and crest_wind >= THRESHOLD_CREST_WIND_CAUTION:
+            msg = "Starker Wind am Kamm aus N/NE"
+            if krit_foehn in ['Nord', 'Beide']:
+                if crest_wind >= THRESHOLD_CREST_WIND_DANGER:
+                    level = "danger"
+                    indicators.append(f"{msg} (Flugverbot)")
+                else:
+                    if level != "danger": level = "caution"
+                    indicators.append(msg)
+            else:
+                indicators.append(f"{msg} (Biseströmung, nicht föhnkritisch)")
 
     # 3. Luftfeuchtigkeit (trocken = Föhn durchgebrochen)
     if rh_nord is not None:
-        indicators.append(f"Luftfeuchtigkeit: {round(rh_nord)}%")
+        indicators.append(f"Luftfeuchtigkeit (Nord): {round(rh_nord)}%")
         if rh_nord < THRESHOLD_HUMIDITY_LOW and level != "none":
             indicators.append("Trockene Föhnluft im Tal")
 
@@ -197,17 +228,19 @@ def evaluate_foehn(
         if level == "caution":
             indicators.append("Starke Böen → zusätzliche Vorsicht")
 
-    if level == "none" and delta_p is not None and delta_p > 0:
-        indicators.append("Kein Föhn-Alarm, aber Druckgradient vorhanden.")
+    if level == "none" and ((delta_p_sued and delta_p_sued > 0) or (delta_p_nord and delta_p_nord > 0)):
+        dir_str = "Süd" if is_suedfoehn_active else "Nord"
+        indicators.append(f"Kein Föhn-Alarm, aber {dir_str}-Druckgradient vorhanden.")
 
     label = {"none": "Kein Föhn", "caution": "Föhn-Vorsicht", "danger": "Föhn-Gefahr"}[level]
-    message = _build_message(level, delta_p, crest_wind, crest_dir, rh_nord)
+    message = _build_message(level, delta_p_sued if is_suedfoehn_active else delta_p_nord, crest_wind, crest_dir, rh_nord)
 
     return {
         "level": level,
         "label": label,
         "message": message,
-        "delta_p_hpa": delta_p,
+        # Für Abwärtskompatibilität liefern wir den Delta-P der aktuell aktiven Strömung zurück
+        "delta_p_hpa": delta_p_sued if is_suedfoehn_active else delta_p_nord,
         "crest_wind_kmh": round(crest_wind, 0) if crest_wind is not None else None,
         "crest_dir_deg": round(crest_dir, 0) if crest_dir is not None else None,
         "humidity_nord": round(rh_nord, 0) if rh_nord is not None else None,

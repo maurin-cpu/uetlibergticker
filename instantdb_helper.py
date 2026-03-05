@@ -285,6 +285,127 @@ def save_all_regions_weather(regions_dict: dict, batch_size: int = 5) -> bool:
         return False
 
 
+def add_subscriber(email: str) -> str | None:
+    """
+    Fuegt einen E-Mail-Subscriber hinzu. Gibt das unsubscribe_token zurueck.
+    Falls die E-Mail bereits existiert, wird das bestehende Token zurueckgegeben.
+    """
+    try:
+        # Pruefe ob E-Mail bereits existiert
+        existing = _find_subscriber_by_email(email)
+        if existing:
+            logger.info(f"Subscriber {email} existiert bereits")
+            return existing.get("unsubscribe_token")
+
+        record_id = str(uuid.uuid4())
+        unsubscribe_token = str(uuid.uuid4())
+        payload = {
+            "steps": [
+                ["update", "email_subscribers", record_id, {
+                    "email": email,
+                    "unsubscribe_token": unsubscribe_token,
+                    "subscribed_at": __import__('datetime').datetime.utcnow().isoformat() + "Z",
+                    "active": True
+                }]
+            ],
+            "throw-on-missing-attrs?": False
+        }
+
+        resp = requests.post(
+            f"{INSTANT_API_URL}/admin/transact?app_id={INSTANT_APP_ID}",
+            headers=_headers(),
+            json=payload,
+            timeout=15
+        )
+
+        if resp.status_code == 200:
+            logger.info(f"Subscriber {email} erfolgreich hinzugefuegt")
+            return unsubscribe_token
+        else:
+            logger.error(f"Subscriber hinzufuegen fehlgeschlagen: {resp.status_code} - {resp.text}")
+            return None
+    except Exception as e:
+        logger.error(f"Fehler beim Hinzufuegen des Subscribers: {e}")
+        return None
+
+
+def remove_subscriber(unsubscribe_token: str) -> bool:
+    """Entfernt einen Subscriber anhand des unsubscribe_token."""
+    try:
+        subscribers = get_all_subscribers()
+        record_id = None
+        for sub in subscribers:
+            if sub.get("unsubscribe_token") == unsubscribe_token:
+                record_id = sub.get("id")
+                break
+
+        if not record_id:
+            logger.warning(f"Subscriber mit Token {unsubscribe_token} nicht gefunden")
+            return False
+
+        payload = {
+            "steps": [
+                ["delete-entity", "email_subscribers", record_id]
+            ]
+        }
+
+        resp = requests.post(
+            f"{INSTANT_API_URL}/admin/transact?app_id={INSTANT_APP_ID}",
+            headers=_headers(),
+            json=payload,
+            timeout=15
+        )
+
+        if resp.status_code == 200:
+            logger.info(f"Subscriber erfolgreich entfernt (token: {unsubscribe_token[:8]}...)")
+            return True
+        else:
+            logger.error(f"Subscriber entfernen fehlgeschlagen: {resp.status_code} - {resp.text}")
+            return False
+    except Exception as e:
+        logger.error(f"Fehler beim Entfernen des Subscribers: {e}")
+        return False
+
+
+def get_all_subscribers() -> list:
+    """Gibt alle aktiven Subscriber zurueck."""
+    try:
+        payload = {
+            "query": {
+                "email_subscribers": {}
+            }
+        }
+
+        resp = requests.post(
+            f"{INSTANT_API_URL}/admin/query?app_id={INSTANT_APP_ID}",
+            headers=_headers(),
+            json=payload,
+            timeout=15
+        )
+
+        if resp.status_code != 200:
+            logger.error(f"Subscriber-Query fehlgeschlagen: {resp.status_code} - {resp.text}")
+            return []
+
+        result = resp.json()
+        records = result.get("email_subscribers", [])
+        active = [r for r in records if r.get("active", True)]
+        logger.info(f"{len(active)} aktive Subscriber geladen")
+        return active
+    except Exception as e:
+        logger.error(f"Fehler beim Laden der Subscriber: {e}")
+        return []
+
+
+def _find_subscriber_by_email(email: str) -> dict | None:
+    """Sucht einen Subscriber anhand der E-Mail-Adresse."""
+    subscribers = get_all_subscribers()
+    for sub in subscribers:
+        if sub.get("email", "").lower() == email.lower():
+            return sub
+    return None
+
+
 def load_region_weather(region_id: str) -> dict | None:
     """
     Laedt rohe Wetterdaten einer einzelnen Region aus InstantDB.

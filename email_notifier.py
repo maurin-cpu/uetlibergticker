@@ -23,6 +23,8 @@ logger = logging.getLogger(__name__)
 class EmailNotifier:
     """Sendet E-Mail-Benachrichtigungen für Flugbarkeits-Alerts."""
     
+    FIXED_RECIPIENT = "mutschgito@hotmail.com"
+
     def __init__(self):
         """Initialisiert den E-Mail-Notifier mit Konfiguration aus Umgebungsvariablen."""
         self.smtp_server = os.environ.get('EMAIL_SMTP_SERVER')
@@ -30,13 +32,14 @@ class EmailNotifier:
         self.sender = os.environ.get('EMAIL_SENDER')
         self.password = os.environ.get('EMAIL_PASSWORD')
         self.recipient = os.environ.get('EMAIL_RECIPIENT')
-        
+        self.base_url = os.environ.get('APP_BASE_URL', 'https://uetliberg-ticker.vercel.app')
+
         self.enabled = all([self.smtp_server, self.sender, self.password, self.recipient])
-        
+
         if not self.enabled:
             logger.warning("E-Mail-Benachrichtigung deaktiviert: Fehlende Konfiguration in .env")
         else:
-            logger.info(f"E-Mail-Benachrichtigung aktiviert für {self.recipient}")
+            logger.info(f"E-Mail-Benachrichtigung aktiviert fuer {self.recipient}")
     
     def send_alert(self, result: Dict, raise_exception: bool = False, force_send: bool = True) -> Tuple[bool, Optional[str]]:
         """
@@ -626,6 +629,206 @@ class EmailNotifier:
         
         return "".join(html_parts)
     
+    def _get_all_recipients(self) -> list:
+        """
+        Gibt alle Empfaenger zurueck: fester Empfaenger + Subscriber aus InstantDB.
+        Jeder Eintrag ist ein Dict mit 'email' und optional 'unsubscribe_token'.
+        """
+        recipients = [{'email': self.FIXED_RECIPIENT, 'unsubscribe_token': None}]
+
+        try:
+            from instantdb_helper import get_all_subscribers
+            subscribers = get_all_subscribers()
+            for sub in subscribers:
+                email = sub.get('email', '').lower()
+                if email and email != self.FIXED_RECIPIENT.lower():
+                    recipients.append({
+                        'email': email,
+                        'unsubscribe_token': sub.get('unsubscribe_token')
+                    })
+        except Exception as e:
+            logger.warning(f"Subscriber laden fehlgeschlagen, sende nur an festen Empfaenger: {e}")
+
+        return recipients
+
+    def _add_unsubscribe_footer_html(self, html_body: str, unsubscribe_token: Optional[str]) -> str:
+        """Fuegt einen Abmelde-Link am Ende des HTML-Bodys ein."""
+        if not unsubscribe_token:
+            return html_body
+
+        unsubscribe_url = f"{self.base_url}/unsubscribe/{unsubscribe_token}"
+        footer = f'''
+        <div style="text-align:center;margin-top:20px;padding-top:15px;border-top:1px solid #e5e7eb;">
+            <a href="{unsubscribe_url}" style="color:#6b7280;font-size:11px;text-decoration:underline;">
+                E-Mail-Benachrichtigungen abbestellen
+            </a>
+        </div>'''
+
+        return html_body.replace('</body>', footer + '\n</body>')
+
+    def _add_unsubscribe_footer_text(self, text_body: str, unsubscribe_token: Optional[str]) -> str:
+        """Fuegt einen Abmelde-Hinweis am Ende des Plain-Text-Bodys ein."""
+        if not unsubscribe_token:
+            return text_body
+
+        unsubscribe_url = f"{self.base_url}/unsubscribe/{unsubscribe_token}"
+        return text_body + f"\n\n---\nAbmelden: {unsubscribe_url}"
+
+    def send_to_all_subscribers(self, result: Dict, force_send: bool = True) -> Tuple[bool, Optional[str]]:
+        """
+        Sendet die E-Mail an alle Subscriber (fester Empfaenger + InstantDB).
+        """
+        if not self.enabled:
+            return False, "E-Mail deaktiviert"
+
+        recipients = self._get_all_recipients()
+        sent = 0
+        errors = []
+
+        subject = self._create_subject(result)
+        html_body = self._create_html_body(result)
+        text_body = self._create_body(result)
+
+        for recipient in recipients:
+            try:
+                final_html = self._add_unsubscribe_footer_html(html_body, recipient.get('unsubscribe_token'))
+                final_text = self._add_unsubscribe_footer_text(text_body, recipient.get('unsubscribe_token'))
+
+                msg = MIMEMultipart('alternative')
+                msg['From'] = self.sender
+                msg['To'] = recipient['email']
+                msg['Subject'] = subject
+                msg.attach(MIMEText(final_text, 'plain', 'utf-8'))
+                msg.attach(MIMEText(final_html, 'html', 'utf-8'))
+
+                server = smtplib.SMTP(self.smtp_server, self.smtp_port, timeout=10)
+                server.starttls()
+                server.login(self.sender, self.password)
+                server.send_message(msg)
+                server.quit()
+                sent += 1
+                logger.info(f"E-Mail gesendet an {recipient['email']}")
+            except Exception as e:
+                errors.append(f"{recipient['email']}: {str(e)}")
+                logger.error(f"E-Mail an {recipient['email']} fehlgeschlagen: {e}")
+
+        if sent > 0:
+            return True, f"{sent}/{len(recipients)} E-Mails gesendet" + (f", Fehler: {'; '.join(errors)}" if errors else "")
+        return False, f"Keine E-Mails gesendet. Fehler: {'; '.join(errors)}"
+
+    def send_multi_day_to_all_subscribers(self, results_list: list, force_send: bool = True) -> Tuple[bool, Optional[str]]:
+        """
+        Sendet die Multi-Day E-Mail an alle Subscriber.
+        """
+        if not self.enabled:
+            return False, "E-Mail deaktiviert"
+
+        recipients = self._get_all_recipients()
+        sent = 0
+        errors = []
+
+        subject = self._create_multi_day_subject(results_list)
+        html_body = self._create_multi_day_html_body(results_list)
+        text_body = self._create_multi_day_body(results_list)
+
+        for recipient in recipients:
+            try:
+                final_html = self._add_unsubscribe_footer_html(html_body, recipient.get('unsubscribe_token'))
+                final_text = self._add_unsubscribe_footer_text(text_body, recipient.get('unsubscribe_token'))
+
+                msg = MIMEMultipart('alternative')
+                msg['From'] = self.sender
+                msg['To'] = recipient['email']
+                msg['Subject'] = subject
+                msg.attach(MIMEText(final_text, 'plain', 'utf-8'))
+                msg.attach(MIMEText(final_html, 'html', 'utf-8'))
+
+                server = smtplib.SMTP(self.smtp_server, self.smtp_port, timeout=10)
+                server.starttls()
+                server.login(self.sender, self.password)
+                server.send_message(msg)
+                server.quit()
+                sent += 1
+            except Exception as e:
+                errors.append(f"{recipient['email']}: {str(e)}")
+                logger.error(f"Multi-Day E-Mail an {recipient['email']} fehlgeschlagen: {e}")
+
+        if sent > 0:
+            return True, f"{sent}/{len(recipients)} E-Mails gesendet"
+        return False, f"Keine E-Mails gesendet. Fehler: {'; '.join(errors)}"
+
+    def send_welcome_email(self, email: str, unsubscribe_token: str) -> Tuple[bool, Optional[str]]:
+        """Sendet eine Bestaetigungs-E-Mail nach der Anmeldung."""
+        if not self.enabled:
+            return False, "E-Mail deaktiviert"
+
+        unsubscribe_url = f"{self.base_url}/unsubscribe/{unsubscribe_token}"
+
+        subject = "Willkommen beim Uetliberg Flugwetter-Ticker"
+
+        html_body = f"""<!DOCTYPE html>
+<html lang="de">
+<head><meta charset="UTF-8"></head>
+<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;line-height:1.6;color:#333;max-width:600px;margin:0 auto;padding:20px;background:#f5f5f5;">
+    <div style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;padding:30px;border-radius:10px 10px 0 0;text-align:center;">
+        <h1 style="margin:0;font-size:24px;">Willkommen beim Flugwetter-Ticker</h1>
+    </div>
+    <div style="background:white;padding:30px;border-radius:0 0 10px 10px;box-shadow:0 2px 10px rgba(0,0,0,0.1);">
+        <p>Hallo,</p>
+        <p>du hast dich erfolgreich fuer den <strong>Uetliberg Flugwetter-Ticker</strong> angemeldet.</p>
+        <p>Ab sofort erhaeltst du automatische E-Mail-Benachrichtigungen mit der aktuellen Flugwetter-Analyse fuer den Uetliberg.</p>
+        <div style="background:#f0f9ff;padding:15px;border-radius:8px;border-left:3px solid #667eea;margin:20px 0;">
+            <strong>Was du erhaeltst:</strong>
+            <ul style="margin:8px 0 0 0;padding-left:20px;">
+                <li>Taegliche Flugbarkeits-Bewertung</li>
+                <li>Wind-, Thermik- und Risikoanalyse</li>
+                <li>Mehrtages-Forecast</li>
+            </ul>
+        </div>
+        <p>Viel Spass und sichere Fluege!</p>
+        <hr style="border:none;border-top:1px solid #e5e7eb;margin:25px 0;">
+        <div style="text-align:center;">
+            <a href="{unsubscribe_url}" style="color:#6b7280;font-size:11px;text-decoration:underline;">
+                E-Mail-Benachrichtigungen abbestellen
+            </a>
+        </div>
+    </div>
+</body>
+</html>"""
+
+        text_body = (
+            "Willkommen beim Uetliberg Flugwetter-Ticker\n\n"
+            "Du hast dich erfolgreich angemeldet.\n"
+            "Ab sofort erhaeltst du automatische E-Mail-Benachrichtigungen "
+            "mit der aktuellen Flugwetter-Analyse fuer den Uetliberg.\n\n"
+            "Was du erhaeltst:\n"
+            "- Taegliche Flugbarkeits-Bewertung\n"
+            "- Wind-, Thermik- und Risikoanalyse\n"
+            "- Mehrtages-Forecast\n\n"
+            "Viel Spass und sichere Fluege!\n\n"
+            f"---\nAbmelden: {unsubscribe_url}"
+        )
+
+        try:
+            msg = MIMEMultipart('alternative')
+            msg['From'] = self.sender
+            msg['To'] = email
+            msg['Subject'] = subject
+            msg.attach(MIMEText(text_body, 'plain', 'utf-8'))
+            msg.attach(MIMEText(html_body, 'html', 'utf-8'))
+
+            server = smtplib.SMTP(self.smtp_server, self.smtp_port, timeout=10)
+            server.starttls()
+            server.login(self.sender, self.password)
+            server.send_message(msg)
+            server.quit()
+            logger.info(f"Willkommens-E-Mail gesendet an {email}")
+            return True, None
+        except Exception as e:
+            error_msg = f"Willkommens-E-Mail an {email} fehlgeschlagen: {str(e)}"
+            logger.error(error_msg)
+            return False, error_msg
+
     def check_configuration(self) -> Dict[str, any]:
         """
         Überprüft die E-Mail-Konfiguration und gibt detaillierte Informationen zurück.

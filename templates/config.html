@@ -462,6 +462,15 @@
                         <input type="text" id="loc-windrichtung" placeholder="z.B. N-O">
                         <span class="form-hint">Erlaubte Windrichtung fuer den Startplatz (z.B. N-O, SW-NW)</span>
                     </div>
+                    <div class="form-group">
+                        <label for="loc-foehn">Kritischer Föhn</label>
+                        <select id="loc-foehn">
+                            <option value="Süd">Südföhn</option>
+                            <option value="Nord">Nordföhn</option>
+                            <option value="Beide">Beide (Süd & Nord)</option>
+                        </select>
+                        <span class="form-hint">Welcher Föhn löst am Startplatz Gefahrenwarnungen aus?</span>
+                    </div>
                     <div class="form-group full-width">
                         <label for="loc-bemerkung">Bemerkung</label>
                         <textarea id="loc-bemerkung" rows="3" placeholder="Besonderheiten zum Startplatz..."></textarea>
@@ -621,6 +630,7 @@
                 document.getElementById('loc-typ').value = c.location.typ || '';
                 document.getElementById('loc-fluggebiet').value = c.location.fluggebiet || '';
                 document.getElementById('loc-windrichtung').value = c.location.windrichtung || '';
+                document.getElementById('loc-foehn').value = c.location.kritischer_foehn || 'Süd';
                 document.getElementById('loc-bemerkung').value = c.location.bemerkung || '';
 
                 // API
@@ -653,6 +663,7 @@
                     typ: document.getElementById('loc-typ').value,
                     fluggebiet: document.getElementById('loc-fluggebiet').value,
                     windrichtung: document.getElementById('loc-windrichtung').value,
+                    kritischer_foehn: document.getElementById('loc-foehn').value,
                     bemerkung: document.getElementById('loc-bemerkung').value,
                 },
                 api: {

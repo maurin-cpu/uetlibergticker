@@ -58,7 +58,10 @@ try:
         load_weather_data as instantdb_load,
         save_evaluation_data as instantdb_save_eval,
         load_evaluation_data as instantdb_load_eval,
-        load_region_weather as instantdb_load_region
+        load_region_weather as instantdb_load_region,
+        add_subscriber as instantdb_add_subscriber,
+        remove_subscriber as instantdb_remove_subscriber,
+        get_all_subscribers as instantdb_get_subscribers
     )
 except ImportError:
     instantdb_save = None
@@ -66,6 +69,9 @@ except ImportError:
     instantdb_save_eval = None
     instantdb_load_eval = None
     instantdb_load_region = None
+    instantdb_add_subscriber = None
+    instantdb_remove_subscriber = None
+    instantdb_get_subscribers = None
 
 # Globaler Cache für Wetterdaten (für Vercel Instanzen)
 CACHED_WEATHER_DATA = None
@@ -755,6 +761,7 @@ def api_config_get():
                 'typ': config.LOCATION.get('typ', ''),
                 'fluggebiet': config.LOCATION.get('fluggebiet', ''),
                 'windrichtung': config.LOCATION.get('windrichtung', ''),
+                'kritischer_foehn': config.LOCATION.get('kritischer_foehn', 'Süd'),
                 'bemerkung': config.LOCATION.get('bemerkung', ''),
             },
             'api': {
@@ -860,6 +867,7 @@ def _apply_config(data):
         if 'typ' in loc: config.LOCATION['typ'] = loc['typ']
         if 'fluggebiet' in loc: config.LOCATION['fluggebiet'] = loc['fluggebiet']
         if 'windrichtung' in loc: config.LOCATION['windrichtung'] = loc['windrichtung']
+        if 'kritischer_foehn' in loc: config.LOCATION['kritischer_foehn'] = loc['kritischer_foehn']
         if 'bemerkung' in loc: config.LOCATION['bemerkung'] = loc['bemerkung']
 
     if 'api' in data:
@@ -1010,7 +1018,13 @@ def api_evaluation():
 def api_evaluation_raw():
     """API-Endpoint für rohe Evaluierungsdaten (kompatibel mit direktem JSON-Zugriff)."""
     try:
-        # Lade die rohen JSON-Daten direkt
+        # Versuche zuerst aus InstantDB zu laden (falls konfiguriert)
+        if instantdb_load_eval:
+            db_eval = instantdb_load_eval()
+            if db_eval:
+                return jsonify(db_eval)
+
+        # Lade die rohen JSON-Daten als Fallback
         # Für Vercel: Verwende /tmp falls verfügbar, sonst data/
         evaluations_file = get_evaluations_json_path()
         
@@ -1329,6 +1343,62 @@ def api_trigger_update():
 def api_auto_email():
     """API-Endpoint für automatische E-Mail (ruft intern /api/cron auf)."""
     return api_cron()
+
+
+@app.route('/api/subscribe', methods=['POST'])
+def api_subscribe():
+    """Registriert eine neue E-Mail fuer den Newsletter."""
+    import re
+    if not instantdb_add_subscriber:
+        return jsonify({'success': False, 'error': 'Abo-System nicht verfuegbar'}), 500
+
+    data = request.get_json(silent=True) or {}
+    email = (data.get('email') or '').strip().lower()
+
+    if not email or not re.match(r'^[^@\s]+@[^@\s]+\.[^@\s]+$', email):
+        return jsonify({'success': False, 'error': 'Bitte eine gueltige E-Mail-Adresse eingeben'}), 400
+
+    token = instantdb_add_subscriber(email)
+    if token:
+        # Bestaetigungs-E-Mail senden
+        email_sent = False
+        email_error = None
+        if EmailNotifier:
+            try:
+                notifier = EmailNotifier()
+                if notifier.enabled:
+                    email_sent, email_error = notifier.send_welcome_email(email, token)
+                else:
+                    email_error = "E-Mail nicht konfiguriert (SMTP-Daten fehlen)"
+            except Exception as e:
+                email_error = str(e)
+
+        if email_sent:
+            return jsonify({'success': True, 'message': 'Erfolgreich angemeldet! Bestaetigungs-E-Mail wurde gesendet.'})
+        else:
+            return jsonify({'success': True, 'message': f'Angemeldet, aber Bestaetigungs-E-Mail konnte nicht gesendet werden: {email_error or "Unbekannt"}'})
+    else:
+        return jsonify({'success': False, 'error': 'Fehler beim Speichern. Bitte versuche es spaeter erneut.'}), 500
+
+
+@app.route('/unsubscribe/<token>')
+def unsubscribe(token):
+    """Meldet einen Subscriber ab und zeigt eine Bestaetigungsseite."""
+    if not instantdb_remove_subscriber:
+        return '<html><body style="font-family:sans-serif;text-align:center;padding:60px;"><h2>Abo-System nicht verfuegbar</h2></body></html>', 500
+
+    success = instantdb_remove_subscriber(token)
+    if success:
+        return '''<html><body style="font-family:sans-serif;text-align:center;padding:60px;background:#0F172A;color:#F8FAFC;">
+            <h2>Erfolgreich abgemeldet</h2>
+            <p>Du erhaeltst keine weiteren Flugwetter-E-Mails.</p>
+            <a href="/" style="color:#818CF8;">Zurueck zur Startseite</a>
+        </body></html>'''
+    else:
+        return '''<html><body style="font-family:sans-serif;text-align:center;padding:60px;background:#0F172A;color:#F8FAFC;">
+            <h2>Link ungueltig oder bereits abgemeldet</h2>
+            <a href="/" style="color:#818CF8;">Zurueck zur Startseite</a>
+        </body></html>''', 404
 
 
 if __name__ == '__main__':

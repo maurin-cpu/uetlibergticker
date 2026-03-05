@@ -86,29 +86,69 @@ def handler(request):
                 }
             }
 
-        # Lade Evaluierungen aus evaluations.json
+        # Versuche zuerst aus InstantDB zu laden
+        evaluations_data = None
+        try:
+            from instantdb_helper import load_evaluation_data
+            evaluations_data = load_evaluation_data()
+            if evaluations_data:
+                logger.info("Evaluierungen erfolgreich aus InstantDB geladen für E-Mail")
+        except Exception as e:
+            logger.error(f"Fehler beim Laden der Evaluierungen aus InstantDB: {str(e)}")
+            
+        # Fallback auf lokale json Datei
         evaluations_file = None
-        if os.path.exists('/tmp') and Path('/tmp/evaluations.json').exists():
-            evaluations_file = Path('/tmp/evaluations.json')
-        elif Path("data/evaluations.json").exists():
-            evaluations_file = Path("data/evaluations.json")
+        if not evaluations_data:
+            if os.path.exists('/tmp') and Path('/tmp/evaluations.json').exists():
+                evaluations_file = Path('/tmp/evaluations.json')
+            elif Path("data/evaluations.json").exists():
+                evaluations_file = Path("data/evaluations.json")
 
-        if not evaluations_file or not evaluations_file.exists():
-            # Keine Evaluierungen vorhanden - führe Cron-Job aus
-            logger.info("Keine Evaluierungen gefunden - führe Cron-Job aus")
+            if not evaluations_file or not evaluations_file.exists():
+                # Keine Evaluierungen vorhanden - führe Cron-Job aus
+                logger.info("Keine Evaluierungen gefunden (weder DB noch lokal) - führe Cron-Job aus")
 
-            try:
-                # Importiere und führe Cron-Handler aus
-                from api.cron import handler as cron_handler
-                cron_result = cron_handler(request)
+                try:
+                    # Importiere und führe Cron-Handler aus
+                    from api.cron import handler as cron_handler
+                    cron_result = cron_handler(request)
 
-                # Prüfe ob Cron-Job erfolgreich war
-                cron_body = json.loads(cron_result['body'])
-                if not cron_body.get('success'):
-                    error_msg = "Cron-Job fehlgeschlagen - keine E-Mails gesendet"
-                    logger.error(error_msg)
+                    # Prüfe ob Cron-Job erfolgreich war
+                    cron_body = json.loads(cron_result['body'])
+                    if not cron_body.get('success'):
+                        error_msg = "Cron-Job fehlgeschlagen - keine E-Mails gesendet"
+                        logger.error(error_msg)
+                        results['errors'].append(error_msg)
+                        results['cron_result'] = cron_body
+                        return {
+                            'statusCode': 500,
+                            'body': json.dumps(results, ensure_ascii=False, indent=2),
+                            'headers': {
+                                'Content-Type': 'application/json; charset=utf-8'
+                            }
+                        }
+
+                    logger.info("Cron-Job erfolgreich ausgeführt")
+                    results['cron_executed'] = True
+
+                    # Versuche erneut Evaluierungen aus DB zu laden (da der Cron sie nun gespeichert haben sollte)
+                    try:
+                        from instantdb_helper import load_evaluation_data
+                        evaluations_data = load_evaluation_data()
+                    except Exception:
+                        pass
+                        
+                    # Fallback auf lokales file
+                    if not evaluations_data:
+                        if os.path.exists('/tmp') and Path('/tmp/evaluations.json').exists():
+                            evaluations_file = Path('/tmp/evaluations.json')
+                        elif Path("data/evaluations.json").exists():
+                            evaluations_file = Path("data/evaluations.json")
+
+                except Exception as e:
+                    error_msg = f"Fehler beim Ausführen des Cron-Jobs: {str(e)}"
+                    logger.error(error_msg, exc_info=True)
                     results['errors'].append(error_msg)
-                    results['cron_result'] = cron_body
                     return {
                         'statusCode': 500,
                         'body': json.dumps(results, ensure_ascii=False, indent=2),
@@ -117,54 +157,34 @@ def handler(request):
                         }
                     }
 
-                logger.info("Cron-Job erfolgreich ausgeführt")
-                results['cron_executed'] = True
-
-                # Versuche erneut Evaluierungen zu laden
-                if os.path.exists('/tmp') and Path('/tmp/evaluations.json').exists():
-                    evaluations_file = Path('/tmp/evaluations.json')
-                elif Path("data/evaluations.json").exists():
-                    evaluations_file = Path("data/evaluations.json")
-
-            except Exception as e:
-                error_msg = f"Fehler beim Ausführen des Cron-Jobs: {str(e)}"
-                logger.error(error_msg, exc_info=True)
+            # Lade Evaluierungen lokal
+            if not evaluations_data and (not evaluations_file or not evaluations_file.exists()):
+                error_msg = "Keine Evaluierungen verfügbar - kann keine E-Mails senden"
+                logger.error(error_msg)
                 results['errors'].append(error_msg)
                 return {
-                    'statusCode': 500,
+                    'statusCode': 404,
                     'body': json.dumps(results, ensure_ascii=False, indent=2),
                     'headers': {
                         'Content-Type': 'application/json; charset=utf-8'
                     }
                 }
 
-        # Lade Evaluierungen
-        if not evaluations_file or not evaluations_file.exists():
-            error_msg = "Keine Evaluierungen verfügbar - kann keine E-Mails senden"
-            logger.error(error_msg)
-            results['errors'].append(error_msg)
-            return {
-                'statusCode': 404,
-                'body': json.dumps(results, ensure_ascii=False, indent=2),
-                'headers': {
-                    'Content-Type': 'application/json; charset=utf-8'
-                }
-            }
-
-        try:
-            with open(evaluations_file, 'r', encoding='utf-8') as f:
-                evaluations_data = json.load(f)
-        except Exception as e:
-            error_msg = f"Fehler beim Laden der Evaluierungen: {str(e)}"
-            logger.error(error_msg)
-            results['errors'].append(error_msg)
-            return {
-                'statusCode': 500,
-                'body': json.dumps(results, ensure_ascii=False, indent=2),
-                'headers': {
-                    'Content-Type': 'application/json; charset=utf-8'
-                }
-            }
+            if not evaluations_data:
+                try:
+                    with open(evaluations_file, 'r', encoding='utf-8') as f:
+                        evaluations_data = json.load(f)
+                except Exception as e:
+                    error_msg = f"Fehler beim Laden der lokalen Evaluierungen: {str(e)}"
+                    logger.error(error_msg)
+                    results['errors'].append(error_msg)
+                    return {
+                        'statusCode': 500,
+                        'body': json.dumps(results, ensure_ascii=False, indent=2),
+                        'headers': {
+                            'Content-Type': 'application/json; charset=utf-8'
+                        }
+                    }
 
         # Extrahiere Evaluierungen
         evaluations_list = evaluations_data.get('evaluations', [])
@@ -189,7 +209,7 @@ def handler(request):
         duration = (end_time - start_time).total_seconds()
         results['duration_seconds'] = duration
 
-        logger.info(f"Auto-E-Mail Job abgeschlossen: {emails_sent}/{len(evaluations_list)} E-Mails gesendet")
+        logger.info(f"Auto-E-Mail Job abgeschlossen: {results['emails_sent']}/{len(evaluations_list)} E-Mails gesendet")
 
         status_code = 200 if results['success'] else 500
 

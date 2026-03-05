@@ -64,7 +64,7 @@ def handler(request):
             if weather_data:
                 results['steps']['fetch_weather'] = {
                     'success': True,
-                    'message': f"Wetterdaten erfolgreich abgerufen für {len(list(weather_data.values())[0].get('hourly_data', {})))} Zeitstempel"
+                    'message': f"Wetterdaten erfolgreich abgerufen für {len(list(weather_data.values())[0].get('hourly_data', {}))} Zeitstempel"
                 }
                 logger.info("✓ Wetterdaten erfolgreich abgerufen")
             else:
@@ -112,6 +112,25 @@ def handler(request):
                     ]
                 }
                 logger.info(f"✓ Analyse erfolgreich für {len(analysis_results)} Tag(e)")
+                
+                # Evaluationen in InstantDB speichern
+                try:
+                    from instantdb_helper import save_evaluation_data
+                    from config import get_evaluations_json_path
+                    
+                    eval_path = get_evaluations_json_path()
+                    if eval_path.exists():
+                        with open(eval_path, 'r', encoding='utf-8') as f:
+                            eval_data = json.load(f)
+                        db_ok = save_evaluation_data(eval_data)
+                        if db_ok:
+                            logger.info("✓ Evaluierungen erfolgreich in InstantDB gespeichert")
+                            results['steps']['instantdb_eval'] = {'success': True}
+                        else:
+                            logger.error("Fehler beim Speichern der Evaluierungen in InstantDB")
+                            results['steps']['instantdb_eval'] = {'success': False, 'error': 'InstantDB Error'}
+                except Exception as e:
+                    logger.error(f"Fehler bei InstantDB Speicherung der Evaluierungen: {e}")
             else:
                 raise Exception("Keine Analyse-Ergebnisse zurückgegeben")
                 

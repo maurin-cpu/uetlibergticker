@@ -58,7 +58,7 @@ class LocationEvaluator:
     
     def __init__(self, weather_json_path: str = None, model: str = None):
         self.weather_json_path = weather_json_path or str(get_weather_json_path())
-        self.model = model or os.environ.get('OPENAI_MODEL', 'gpt-4o-mini')
+        self.model = model or os.environ.get('OPENAI_MODEL', 'gpt-4.1-mini')
         self.api_key = os.environ.get('OPENAI_API_KEY')
         
         if not self.api_key:
@@ -146,11 +146,11 @@ class LocationEvaluator:
             return {
                 "flyable": False,
                 "rating": 0,
-                "confidence": 0,
-                "conditions": "DANGEROUS",
-                "summary": f"Fehler: {str(e)}",
+                "day_summary": f"Fehler: {str(e)}",
+                "golden_window": None,
                 "details": {"wind": "", "thermik": "", "risks": f"Systemfehler: {str(e)}"},
                 "recommendation": "Bitte später erneut versuchen.",
+                "sectors": [],
                 "timestamp": datetime.now().isoformat(),
                 "location": LOCATION['name'],
                 "date": date
@@ -227,17 +227,30 @@ class LocationEvaluator:
         raise ValueError(f"Keine Wetterdaten für Uetliberg gefunden")
     
     def _format_hourly_data(self, hourly_data: Dict, pressure_level_data: Dict = None, hours: int = 6) -> str:
-        """Formatiert stündliche Daten für Prompt inkl. Thermik-Berechnungen."""
+        """Formatiert stündliche Daten für Prompt inkl. Thermik-Berechnungen (nur Flugstunden)."""
         if not hourly_data:
             return "Keine stündlichen Daten verfügbar"
         
         if pressure_level_data is None:
             pressure_level_data = {}
             
-        sorted_times = sorted(hourly_data.keys())[:hours]
+        sorted_times = sorted(hourly_data.keys())
         lines = []
+        count = 0
         
-        for i, timestamp in enumerate(sorted_times):
+        for timestamp in sorted_times:
+            # Filtere auf Flugstunden
+            try:
+                dt = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+                if not (FLIGHT_HOURS_START <= dt.hour < FLIGHT_HOURS_END):
+                    continue
+            except Exception:
+                continue
+                
+            if count >= hours:
+                break
+            count += 1
+            
             data = hourly_data[timestamp]
             time_str = timestamp.replace('T', ' ')[:16]
             
@@ -251,40 +264,34 @@ class LocationEvaluator:
             cape = data.get('cape', 'N/A')
             precip = data.get('precipitation', 'N/A')
             sunshine = data.get('sunshine_duration', 'N/A')
-            
+
             if isinstance(sunshine, (int, float)) and sunshine > 0:
                 sunshine_str = f"{sunshine / 3600:.1f}h"
             else:
                 sunshine_str = "0h"
-                
+
             # Neues Top-Modell für Thermikberechnung nutzen
             thermal_info = ""
             try:
-                # Da die Daten in `analyze_hour` indiziert geparst werden, wir müssen die Dict-Listen Struktur annehmen.
-                # In den formatierten location_data structure haben wir bereits die Arrays pro Tag in `hourly_data`.
-                # Warte, timestamp iteriert über Keys. Sind keys strings oder ist hourly_data flach?
-                # Die groupbyday Methode behält timestamp string keys!
-                # Also müssen wir ein Pseudo-Dict bauen, das analyze_hour erwartet (Listen).
-                # Oder wir rufen `calculate_thermal_profile` direkt auf, da wir den Timestep schon extrahiert haben.
-                
-                # Bauen wir die extrahierten Arrays für diesen einen Timestep:
                 p_levels = []
                 for level in [1000, 975, 950, 925, 900, 875, 850, 825, 800, 775, 750, 700, 600]:
                     h_val = pressure_level_data.get(timestamp, {}).get(f'geopotential_height_{level}hPa')
                     t_val = pressure_level_data.get(timestamp, {}).get(f'temperature_{level}hPa')
                     if h_val is not None and t_val is not None:
                         p_levels.append({'pressure': level, 'height': h_val, 'temp': t_val})
-                
+
                 from thermik_calculator import calculate_thermal_profile, calculate_dewpoint
-                surf_dew = calculate_dewpoint(data.get('temperature_2m'), data.get('relative_humidity_2m', 50)) # fallback 50% wenn nicht vorhanden
-                
+                surf_dew = calculate_dewpoint(data.get('temperature_2m'), data.get('relative_humidity_2m', 50))
+
                 therm = calculate_thermal_profile(
                     surface_temp=data.get('temperature_2m'),
                     surface_dewpoint=surf_dew,
-                    elevation_m=850.0,
+                    elevation_m=LOCATION.get('elevation_ref', 850.0),
                     pressure_levels_data=p_levels,
                     boundary_layer_height_agl=data.get('boundary_layer_height'),
                     sunshine_duration_s=data.get('sunshine_duration'),
+                    surface_sensible_heat_flux=data.get('surface_sensible_heat_flux'),
+                    surface_latent_heat_flux=data.get('surface_latent_heat_flux'),
                     shortwave_radiation=data.get('shortwave_radiation'),
                     direct_radiation=data.get('direct_radiation'),
                     diffuse_radiation=data.get('diffuse_radiation'),
@@ -297,30 +304,21 @@ class LocationEvaluator:
                     convective_inhibition=data.get('convective_inhibition'),
                     snow_depth=data.get('snow_depth'),
                     timestamp=timestamp,
-                    slope_azimuth=config.LOCATION.get('slope_azimuth'),
-                    slope_angle=config.LOCATION.get('slope_angle'),
+                    slope_azimuth=LOCATION.get('slope_azimuth'),
+                    slope_angle=LOCATION.get('slope_angle'),
                 )
-                
+
                 if 'error' not in therm:
                     climb = therm['climb_rate']
                     max_h = therm['max_height']
                     lcl = therm.get('lcl')
                     lcl_str = f", LCL/Basis {lcl}m" if lcl else ""
                     thermal_info = f" | THERMIK-PROXY: {climb} m/s bis {max_h}m MSL{lcl_str} (Güte: {therm['rating']}/10)"
-                    # Erweiterte Diagnostik für LLM-Kontext
-                    diag = therm.get('diagnostics', {})
-                    sm_val = diag.get('soil_moisture')
-                    li_val = diag.get('lifted_index')
-                    cin_val = diag.get('convective_inhibition')
-                    if sm_val is not None:
-                        thermal_info += f" | Bodenfeuchte: {sm_val:.2f}"
-                    if li_val is not None:
-                        thermal_info += f" | LI: {li_val:.1f}"
-                    if cin_val is not None:
-                        thermal_info += f" | CIN: {cin_val:.0f} J/kg"
             except Exception as e:
-                thermal_info = f" | Thermik-Fehler: {e}"
-            
+                import traceback
+                err_str = traceback.format_exc().split('\n')[-2]
+                thermal_info = f" | Thermik-Fehler: {e} ({err_str})"
+
             line = (
                 f"{time_str}: Temp {temp}°C | "
                 f"Wind {wind_speed}km/h aus {wind_dir}° (Böen {wind_gusts}km/h) | "
@@ -333,19 +331,36 @@ class LocationEvaluator:
         return "\n".join(lines)
     
     def _format_altitude_wind_profile(self, pressure_level_data: Dict, hours: int = 6) -> str:
-        """Formatiert Höhenwind-Daten für LLM-Prompt."""
+        """Formatiert Höhenwind-Daten für LLM-Prompt (nur Flugstunden, reduzierte Level)."""
         if not pressure_level_data:
             return "Keine Höhenwind-Daten verfügbar"
 
-        sorted_times = sorted(pressure_level_data.keys())[:hours]
+        sorted_times = sorted(pressure_level_data.keys())
         lines = []
+        count = 0
+
+        # Sende nur 3 kritische Level, um Tokens zu sparen (Boden/Inversion, mittlere Höhe, Scherungs-Höhe)
+        # 850hPa (~1500m), 700hPa (~3000m), 500hPa (~5500m)
+        REDUCED_LEVELS = [850, 700, 500]
 
         for timestamp in sorted_times:
+            # Filtere auf Flugstunden
+            try:
+                dt = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+                if not (FLIGHT_HOURS_START <= dt.hour < FLIGHT_HOURS_END):
+                    continue
+            except Exception:
+                continue
+
+            if count >= hours:
+                break
+            count += 1
+
             data = pressure_level_data[timestamp]
             time_str = timestamp.replace('T', ' ')[:16]
 
             altitude_data = []
-            for level in PRESSURE_LEVELS:
+            for level in REDUCED_LEVELS:
                 height = data.get(f'geopotential_height_{level}hPa')
                 wind_speed = data.get(f'wind_speed_{level}hPa')
                 wind_dir = data.get(f'wind_direction_{level}hPa')
@@ -373,19 +388,54 @@ class LocationEvaluator:
         pressure_level_data = location_data.get('pressure_level_data', {})
         date = location_data.get('date', '')
 
-        # Formatiere alle verfügbaren Stunden (nicht nur 6)
-        formatted_hours = self._format_hourly_data(hourly_data, pressure_level_data, hours=len(hourly_data))
+        # Ermittle Anzahl der echten Flugstunden in den Daten um hours-Limit richtig zu setzen
+        total_flight_hours = 0
+        for ts in hourly_data.keys():
+            try:
+                if FLIGHT_HOURS_START <= datetime.fromisoformat(ts.replace('Z', '+00:00')).hour < FLIGHT_HOURS_END:
+                    total_flight_hours += 1
+            except: pass
 
-        # Formatiere Höhenwind-Daten
-        formatted_altitude_wind = self._format_altitude_wind_profile(pressure_level_data, hours=6)
+        # Formatiere alle verfügbaren Flugstunden
+        formatted_hours = self._format_hourly_data(hourly_data, pressure_level_data, hours=total_flight_hours)
 
-        # Erweitere User-Prompt um Flugstunden-Info
-        flight_hours_info = f"\n\nWICHTIG: Diese Analyse bezieht sich nur auf Flugstunden ({FLIGHT_HOURS_START:02d}:00-{FLIGHT_HOURS_END:02d}:00) für {date}."
+        # Formatiere Höhenwind-Daten (auch hier nur Flugstunden, z.B. die ersten 10)
+        formatted_altitude_wind = self._format_altitude_wind_profile(pressure_level_data, hours=10)
 
-        # Höhenwind-Sektion
+        # Föhn-Indikator-Daten laden und formatieren
+        foehn_info = ""
+        try:
+            from foehn_indicators import get_foehn_for_dashboard
+            foehn_result = get_foehn_for_dashboard(forecast_days=2)
+            if foehn_result.get('success') and foehn_result.get('foehn'):
+                f = foehn_result['foehn']
+                foehn_lines = ["\nFÖHN-INDIKATOR (Süd→Nord, Lugano→Zürich):"]
+                foehn_lines.append(f"  Level: {f.get('level', 'none').upper()}")
+                if f.get('delta_p_hpa') is not None:
+                    foehn_lines.append(f"  Delta-P (Süd-Nord): {f['delta_p_hpa']} hPa")
+                if f.get('crest_wind_kmh') is not None:
+                    dir_str = f" aus {f['crest_dir_deg']}°" if f.get('crest_dir_deg') is not None else ""
+                    foehn_lines.append(f"  Kammwind 700hPa: {f['crest_wind_kmh']} km/h{dir_str}")
+                if f.get('humidity_nord') is not None:
+                    foehn_lines.append(f"  Luftfeuchtigkeit Nordseite: {f['humidity_nord']}%")
+                if f.get('gust_ratio') is not None:
+                    foehn_lines.append(f"  Böigkeit-Ratio: {f['gust_ratio']}")
+                indicators = f.get('indicators', [])
+                if indicators:
+                    foehn_lines.append(f"  Indikatoren: {'; '.join(indicators)}")
+                foehn_info = "\n".join(foehn_lines) + "\n"
+                logger.info(f"Föhn-Daten in Prompt eingefügt: Level={f.get('level')}")
+        except Exception as e:
+            logger.warning(f"Föhn-Daten konnten nicht geladen werden: {e}")
+            foehn_info = ""
+
+        # Höhenwind-Sektion (nur wenn Daten vorhanden)
         altitude_wind_section = ""
         if formatted_altitude_wind != "Keine Höhenwind-Daten verfügbar":
-            altitude_wind_section = f"\n\nHÖHENWIND-PROFIL (erste 6 Stunden):\n{formatted_altitude_wind}\n\nAnalysiere das Höhenwindprofil auf Wind-Scherung und thermische Inversionen!"
+            altitude_wind_section = f"\n\n═══════════════════════════════════════\nHÖHENWIND-PROFIL:\n═══════════════════════════════════════\n{formatted_altitude_wind}"
+
+        # Flugstunden-Info
+        flight_hours_info = f"\n\nWICHTIG: Diese Analyse bezieht sich nur auf Flugstunden ({FLIGHT_HOURS_START:02d}:00-{FLIGHT_HOURS_END:02d}:00) für {date}."
 
         user_prompt = LLM_USER_PROMPT_TEMPLATE.format(
             name=location_data.get('name', 'N/A'),
@@ -394,8 +444,8 @@ class LocationEvaluator:
             windrichtung=location_data.get('windrichtung', 'Nicht angegeben'),
             besonderheiten=', '.join(bemerkungen_list) if bemerkungen_list else 'Keine',
             hourly_data=formatted_hours,
-            wind_check_info="",
-            total_hours=len(hourly_data),
+            foehn_info=foehn_info,
+            total_hours=total_flight_hours,
             flight_hours_start=FLIGHT_HOURS_START,
             flight_hours_end=FLIGHT_HOURS_END
         ) + flight_hours_info + altitude_wind_section
@@ -416,7 +466,7 @@ class LocationEvaluator:
         url = "https://api.openai.com/v1/chat/completions"
         headers = {"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"}
         
-        json_supported_models = ["gpt-4-turbo", "gpt-4-turbo-preview", "gpt-4-0125-preview", "gpt-4o", "gpt-4o-mini", "gpt-3.5-turbo"]
+        json_supported_models = ["gpt-4-turbo", "gpt-4-turbo-preview", "gpt-4-0125-preview", "gpt-4o", "gpt-4o-mini", "gpt-4.1-mini", "gpt-4.1-nano", "gpt-3.5-turbo"]
         
         payload = {
             "model": self.model,
@@ -481,7 +531,6 @@ class LocationEvaluator:
         content = response_json['choices'][0]['message']['content']
         result = json.loads(content)
         
-        
         # Validiere kritische Felder, aber behalte alle Details vollständig
         if 'flyable' not in result:
             result['flyable'] = False
@@ -498,35 +547,123 @@ class LocationEvaluator:
         
         result['flyable'] = bool(result.get('flyable', False))
         result['rating'] = int(result.get('rating', 0))
-        result['confidence'] = int(result.get('confidence', 0))
-        result['conditions'] = str(result.get('conditions', 'UNKNOWN'))
         
-        if 'summary' not in result:
+        # day_summary → summary Mapping (Abwärtskompatibilität mit Frontend)
+        if 'day_summary' in result:
+            result['summary'] = result['day_summary']
+        elif 'summary' not in result:
             result['summary'] = "Keine Zusammenfassung verfügbar"
+        
+        # golden_window extrahieren
+        if 'golden_window' not in result:
+            result['golden_window'] = None
+        
         if 'recommendation' not in result:
             result['recommendation'] = "Keine Empfehlung verfügbar"
         
-        # Parse und validiere stündliche Bewertungen
-        if 'hourly_evaluations' in result and isinstance(result['hourly_evaluations'], list):
-            # Validiere jede stündliche Bewertung
-            validated_hourly = []
-            for hourly_eval in result['hourly_evaluations']:
-                if isinstance(hourly_eval, dict):
+        # Parse und validiere Sektoren (neues Format, ersetzt hourly_evaluations)
+        if 'sectors' in result and isinstance(result['sectors'], list):
+            validated_sectors = []
+            for sector in result['sectors']:
+                if isinstance(sector, dict):
                     validated = {
-                        'hour': int(hourly_eval.get('hour', 0)),
-                        'timestamp': str(hourly_eval.get('timestamp', '')),
-                        'conditions': str(hourly_eval.get('conditions', 'UNKNOWN')).upper(),
-                        'flyable': bool(hourly_eval.get('flyable', False)),
-                        'rating': int(hourly_eval.get('rating', 0)),
-                        'reason': str(hourly_eval.get('reason', 'Keine Begründung'))
+                        'slot': str(sector.get('slot', '')),
+                        'safety': str(sector.get('safety', 'SAFE')).upper(),
+                        'flyable': bool(sector.get('flyable', False)),
+                        'rating': int(sector.get('rating', 0)),
+                        'wind_info': str(sector.get('wind_info', '')),
+                        'reason': str(sector.get('reason', 'Keine Begründung'))
                     }
-                    validated_hourly.append(validated)
-            result['hourly_evaluations'] = validated_hourly
+                    validated_sectors.append(validated)
+            result['sectors'] = validated_sectors
         else:
-            # Fallback: Leeres Array wenn nicht vorhanden
-            result['hourly_evaluations'] = []
+            result['sectors'] = []
+        
+        # Conditions aus Sektoren ableiten (5 Stufen)
+        if 'conditions' not in result:
+            if result['sectors']:
+                result['conditions'] = self._derive_day_conditions(result['sectors'], result.get('rating', 0))
+            else:
+                result['conditions'] = 'UNKNOWN'
+        
+        # hourly_evaluations Kompatibilität: Aus Sektoren generieren
+        result['hourly_evaluations'] = self._sectors_to_hourly(result.get('sectors', []))
         
         return result
+    
+    @staticmethod
+    def _sector_to_condition(safety: str, flyable: bool, rating: int) -> str:
+        """
+        Mappt einen Sektor auf eine der 5 Flugkategorien basierend auf Flughöhe:
+
+        LEGENDARY  - Streckenflug, riesige Höhe über Startplatz (rating >= 9)
+        GOOD       - Soaring/Thermik am Hang, mittlere Höhe über Start (rating >= 7)
+        FLYABLE    - Abgleiter, safe aber wenig Höhe (rating < 7)
+        CAUTION    - Grenzwertige Bedingungen (safety=CAUTION)
+        DANGEROUS  - Sicherheitsrisiko (safety=DANGEROUS)
+        """
+        # Sicherheits-Zustände (Top-Priorität)
+        if safety == 'DANGEROUS':
+            return 'DANGEROUS'
+        if safety == 'CAUTION':
+            return 'CAUTION'
+            
+        # Qualitäts-Zustände (Wenn safety SAFE ist)
+        if rating >= 9:
+            return 'LEGENDARY'
+        if rating >= 7:
+            return 'GOOD'
+        return 'FLYABLE'
+
+    def _derive_day_conditions(self, sectors: List[Dict], day_rating: int) -> str:
+        """Leitet die Tages-Condition aus allen Sektoren ab."""
+        if not sectors:
+            return 'UNKNOWN'
+
+        # Beste Condition des Tages (für den Hero-Banner)
+        order = {'DANGEROUS': 0, 'CAUTION': 1, 'FLYABLE': 2, 'GOOD': 3, 'LEGENDARY': 4}
+        best = 'DANGEROUS'
+        for s in sectors:
+            cond = self._sector_to_condition(
+                s.get('safety', 'SAFE'), s.get('flyable', False), s.get('rating', 0)
+            )
+            if order.get(cond, 0) > order.get(best, 0):
+                best = cond
+        return best
+
+    def _sectors_to_hourly(self, sectors: List[Dict]) -> List[Dict]:
+        """Konvertiert Sektoren in hourly_evaluations für Frontend-Kompatibilität."""
+        hourly = []
+
+        for sector in sectors:
+            slot = sector.get('slot', '')
+            if '-' not in slot:
+                continue
+            try:
+                start_str, end_str = slot.split('-')
+                start_hour = int(start_str.split(':')[0])
+                end_hour = int(end_str.split(':')[0])
+
+                condition = self._sector_to_condition(
+                    sector.get('safety', 'SAFE'),
+                    sector.get('flyable', False),
+                    sector.get('rating', 0)
+                )
+
+                for h in range(start_hour, end_hour):
+                    if FLIGHT_HOURS_START <= h < FLIGHT_HOURS_END:
+                        hourly.append({
+                            'hour': h,
+                            'timestamp': '',
+                            'conditions': condition,
+                            'flyable': sector.get('flyable', False),
+                            'rating': sector.get('rating', 0),
+                            'reason': sector.get('reason', '')
+                        })
+            except (ValueError, IndexError):
+                continue
+
+        return hourly
     
     def format_terminal_output(self, result: Dict, use_colors: bool = True) -> str:
         """Formatiert das Evaluierungs-Ergebnis für Terminal-Ausgabe."""
@@ -537,21 +674,29 @@ class LocationEvaluator:
             return f"{Colors.BOLD}{text}{Colors.RESET}" if use_colors else text
         
         conditions = result.get('conditions', 'UNKNOWN').upper()
-        if conditions == 'EXCELLENT' or conditions == 'GOOD':
+        condition_labels = {
+            'LEGENDARY': 'LEGENDÄR', 'GOOD': 'GUT', 'FLYABLE': 'FLIEGBAR',
+            'CAUTION': 'AUFPASSEN', 'DANGEROUS': 'GEFÄHRLICH'
+        }
+        if conditions == 'LEGENDARY':
+            condition_color = '\033[95m'  # Magenta/Purple
+            condition_icon = '🏆'
+        elif conditions == 'GOOD':
             condition_color = Colors.GREEN
             condition_icon = '✅'
-        elif conditions == 'MODERATE':
+        elif conditions == 'FLYABLE':
+            condition_color = Colors.CYAN
+            condition_icon = '🪂'
+        elif conditions == 'CAUTION':
             condition_color = Colors.YELLOW
             condition_icon = '⚠️'
-        elif conditions == 'POOR':
-            condition_color = Colors.ORANGE
-            condition_icon = '❌'
         elif conditions == 'DANGEROUS':
             condition_color = Colors.RED
             condition_icon = '🚫'
         else:
             condition_color = Colors.YELLOW
             condition_icon = '❓'
+        conditions = condition_labels.get(conditions, conditions)
         
         flyable = result.get('flyable', False)
         flyable_text = color("FLUGBAR", Colors.GREEN) if flyable else color("NICHT FLUGBAR", Colors.RED)

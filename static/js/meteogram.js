@@ -48,7 +48,7 @@ window.Meteogram = (function () {
     }
 
     // ===== LAYOUT CONSTANTS =====
-    const MARGIN = { top: 12, right: 24, bottom: 0, left: 56 };
+    const MARGIN = { top: 12, right: 24, bottom: 0, left: 96 };
     const CELL_H = 36;
     const GROUND_ROWS = 4;
     const GROUND_H = GROUND_ROWS * 24;
