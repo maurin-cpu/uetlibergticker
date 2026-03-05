@@ -103,14 +103,14 @@ class LocationEvaluator:
             except Exception as e:
                 logger.warning(f"Fehler beim Speichern der Evaluierungen: {e}")
             
-            # E-Mail-Benachrichtigung konsolidiert senden
+            # E-Mail-Benachrichtigung an alle Subscriber (inkl. fester Empfänger) senden
             if self.email_notifier:
                 try:
-                    success, error_msg = self.email_notifier.send_multi_day_alert(results, force_send=True)
+                    success, error_msg = self.email_notifier.send_multi_day_to_all_subscribers(results, force_send=True)
                     if not success and error_msg:
                         logger.warning(f"E-Mail-Benachrichtigung fehlgeschlagen: {error_msg}")
                     else:
-                        logger.info(f"Konsolidierte E-Mail-Benachrichtigung erfolgreich gesendet")
+                        logger.info(f"Konsolidierte E-Mail an alle Subscriber gesendet")
                 except Exception as e:
                     logger.warning(f"Fehler beim Senden der konsolidierten E-Mail: {e}")
         
