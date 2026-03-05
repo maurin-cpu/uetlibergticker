@@ -1,50 +1,10 @@
 {
   "functions": {
-    "api/**/*.py": {
+    "api/index.py": {
       "maxDuration": 60
     }
   },
   "rewrites": [
-    {
-      "source": "/api/cron",
-      "destination": "/api/cron"
-    },
-    {
-      "source": "/api/auto-email",
-      "destination": "/api/auto_email"
-    },
-    {
-      "source": "/api/weather",
-      "destination": "/api/index"
-    },
-    {
-      "source": "/api/evaluation",
-      "destination": "/api/index"
-    },
-    {
-      "source": "/api/email-config",
-      "destination": "/api/index"
-    },
-    {
-      "source": "/api/test-email",
-      "destination": "/api/index"
-    },
-    {
-      "source": "/api/altitude-wind",
-      "destination": "/api/index"
-    },
-    {
-      "source": "/config",
-      "destination": "/api/index"
-    },
-    {
-      "source": "/api/config/:path*",
-      "destination": "/api/index"
-    },
-    {
-      "source": "/api/config",
-      "destination": "/api/index"
-    },
     {
       "source": "/(.*)",
       "destination": "/api/index"
