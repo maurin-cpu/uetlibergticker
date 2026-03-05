@@ -6,7 +6,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 # ============================================================================
-# METEOROLOGISCHE KONSTANTEN
+# METEOROLOGISCHE KONSTANTEN (physikalisch, nicht konfigurierbar)
 # ============================================================================
 G = 9.81              # Erdbeschleunigung (m/s^2)
 CP = 1005.0           # Spezifische Wärmekapazität trockener Luft (J/(kg*K))
@@ -16,6 +16,36 @@ DALR = 0.0098         # Trockenadiabatischer Temperaturgradient (K/m) (~1°C/100
 SALR = 0.006          # Feuchtadiabatischer Gradient (K/m) (vereinfacht, ~0.6°C/100m)
 RHO = 1.1             # Vereinfachte Luftdichte auf typischer Starthöhe (kg/m^3)
 MU = 0.0002           # Entrainment-Rate (m^-1) - Rate der Einmischung von Umgebungsluft
+
+
+def _get_season(timestamp: str) -> str:
+    """Bestimmt die Jahreszeit aus einem Timestamp."""
+    try:
+        dt = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+        month = dt.month
+        if month in (12, 1, 2):
+            return "winter"
+        elif month in (3, 4, 5):
+            return "spring"
+        elif month in (6, 7, 8):
+            return "summer"
+        else:
+            return "autumn"
+    except Exception:
+        return "spring"  # Fallback
+
+
+def _get_thermal_param(key: str, timestamp: str = None, default=None):
+    """Holt einen Thermik-Parameter aus config.py, jahreszeitabhängig wenn nötig."""
+    try:
+        from config import THERMAL_PARAMS
+        value = THERMAL_PARAMS.get(key, default)
+        if isinstance(value, dict) and timestamp:
+            season = _get_season(timestamp)
+            return value.get(season, default)
+        return value
+    except ImportError:
+        return default
 
 
 def calculate_dewpoint(temp_c: float, rh_percent: float) -> float:
@@ -38,23 +68,25 @@ def calculate_lcl_approx(temp_c: float, dewpoint_c: float, elevation_m: float) -
     return elevation_m + lcl_agl
 
 
-def estimate_sensible_heat_flux(shortwave_radiation: float, sunshine_duration_s: float) -> float:
+def estimate_sensible_heat_flux(shortwave_radiation: float, sunshine_duration_s: float,
+                                timestamp: str = None) -> float:
     """
     Fallback-Schätzung des sensiblen Wärmeflusses (H) aus der Globalstrahlung.
 
-    Physikalische Annahme: Ca. 30% der eintreffenden Sonnenergie erwärmt die Luft
-    direkt (empirischer Bowen-Ratio-Ansatz für mitteleuropäische Verhältnisse).
-    Der Rest geht in Bodenwärme, Verdunstung und langwellige Abstrahlung.
-    Gewichtet mit der tatsächlichen Sonnenscheindauer der Stunde.
+    Physikalische Herleitung:
+      Rn ≈ 0.60-0.70 × SW (nach Albedo + Langwellen-Verlust)
+      H/Rn ≈ 0.30-0.45 (Bowen-Ratio, jahreszeitabhängig)
+      → H ≈ 0.15-0.30 × SW (je nach Jahreszeit)
 
-    Formel: H_estimated = shortwave_radiation * 0.3 * sun_factor
+    Koeffizient wird jahreszeitabhängig aus config.THERMAL_PARAMS geladen.
     """
     if shortwave_radiation is None or shortwave_radiation <= 0:
         return 0.0
     sun_factor = 1.0
     if sunshine_duration_s is not None:
         sun_factor = min(1.0, max(0.0, sunshine_duration_s / 3600.0))
-    return shortwave_radiation * 0.3 * sun_factor
+    coeff = _get_thermal_param("global_radiation_to_H", timestamp, default=0.20)
+    return shortwave_radiation * coeff * sun_factor
 
 
 def calculate_topography_bonus(
@@ -110,9 +142,10 @@ def calculate_topography_bonus(
             
         # Bonus berechnen: Verhältnis Hang-Strahlung zu Flachland-Strahlung
         bonus = cos_theta / sin_alpha
-        
-        # Sanftes Cap (Limit auf 2.5x Bonus, um numerische Explosionen bei sehr tiefer Sonne zu vermeiden)
-        return min(2.5, max(0.5, bonus))
+
+        # Cap aus Config (Default 1.3 — Hang-Enhancement für Konvektion ist moderat)
+        topo_max = _get_thermal_param("topo_bonus_max", timestamp, default=1.3)
+        return min(topo_max, max(0.5, bonus))
         
     except Exception as e:
         logger.error(f"Fehler in calculate_topography_bonus: {e}")
@@ -307,45 +340,53 @@ def calculate_thermal_profile(
             if sunshine_duration_s is not None:
                 sun_factor = min(1.0, max(0.0, sunshine_duration_s / 3600.0))
             
-            # --- SAISONALE PHYSIK ---
-            # 1. Dynamischer Topografie-Bonus (Sonnenhöhe vs Hangneigung)
-            topo_bonus = calculate_topography_bonus(timestamp, slope_azimuth, slope_angle)
-            
+            # --- PHYSIKALISCHE H-BERECHNUNG ---
+            # 1. Topografie-Bonus (nur gedämpfter Anteil wirkt auf konvektive Thermik)
+            raw_topo_bonus = calculate_topography_bonus(timestamp, slope_azimuth, slope_angle)
+            topo_H_fraction = _get_thermal_param("topo_bonus_H_fraction", timestamp, default=0.3)
+            # Effektiver Topo-Bonus: z.B. raw=1.5 → eff = 1.0 + (1.5-1.0)*0.3 = 1.15
+            effective_topo = 1.0 + (raw_topo_bonus - 1.0) * topo_H_fraction
+
             # 2. Saisonale Bowen-Ratio (Vegetationszyklus)
             veg_factor = calculate_seasonal_bowen_ratio_adjustment(timestamp)
-            
-            # Koeffizienten: ~40-45% der Direktstrahlung wird H, ~20-25% der Diffusen.
-            # NUR DIE DIREKTE Strahlung profitiert vom Topografischen Hangneigungs-Bonus!
-            dir_h = direct_radiation * 0.45 * topo_bonus
-            diff_h = diffuse_radiation * 0.25
-            
+
+            # 3. Strahlungskoeffizienten aus Config (jahreszeitabhängig, physikalisch hergeleitet)
+            dir_coeff = _get_thermal_param("direct_radiation_to_H", timestamp, default=0.25)
+            diff_coeff = _get_thermal_param("diffuse_radiation_to_H", timestamp, default=0.10)
+
+            dir_h = direct_radiation * dir_coeff * effective_topo
+            diff_h = diffuse_radiation * diff_coeff
+
             H = (dir_h + diff_h) * sun_factor * veg_factor
-            
-            # ROBUSTNESS-CAP: Uetliberg ist ein Voralpen-Hügel, kein Hochalpiner Fels.
-            H = min(450.0, H)
+
+            # H-Cap aus Config (jahreszeitabhängig)
+            h_cap = _get_thermal_param("H_cap", timestamp, default=220)
+            H = min(h_cap, H)
             
             if H > 0:
                 data_warnings.append(
-                    f"H geschätzt: {H:.0f} W/m² (dir={direct_radiation:.0f}, diff={diffuse_radiation:.0f}) "
-                    f"| Topo-Bonus: {topo_bonus:.2f}x (nur Direkts.) | Veg-Faktor: {veg_factor:.2f}x"
+                    f"H geschätzt: {H:.0f} W/m² (dir={direct_radiation:.0f}×{dir_coeff}, diff={diffuse_radiation:.0f}×{diff_coeff}) "
+                    f"| Topo: {raw_topo_bonus:.2f}→eff {effective_topo:.2f}x | Veg: {veg_factor:.2f}x"
                 )
         else:
             # Fallback 2: Pauschale Schätzung aus Globalstrahlung
-            # Wir nehmen an: 60% Direkt, 40% Diffus -> gemischter Topo-Bonus
-            topo_bonus = calculate_topography_bonus(timestamp, slope_azimuth, slope_angle)
-            mixed_topo_bonus = (topo_bonus * 0.6) + (1.0 * 0.4)
+            raw_topo_bonus = calculate_topography_bonus(timestamp, slope_azimuth, slope_angle)
+            topo_H_fraction = _get_thermal_param("topo_bonus_H_fraction", timestamp, default=0.3)
+            # 60% Direkt, 40% Diffus → gemischter Topo-Effekt (nur Direktanteil)
+            mixed_topo = 1.0 + (raw_topo_bonus - 1.0) * topo_H_fraction * 0.6
             veg_factor = calculate_seasonal_bowen_ratio_adjustment(timestamp)
-            
-            H = estimate_sensible_heat_flux(shortwave_radiation, sunshine_duration_s)
-            H *= mixed_topo_bonus
+
+            H = estimate_sensible_heat_flux(shortwave_radiation, sunshine_duration_s, timestamp)
+            H *= mixed_topo
             H *= veg_factor
-            
-            H = min(450.0, H)
+
+            h_cap = _get_thermal_param("H_cap", timestamp, default=220)
+            H = min(h_cap, H)
             
             if H > 0:
                 data_warnings.append(
                     f"H aus Globalstrahlung geschätzt: {H:.0f} W/m² "
-                    f"| Topo-Bonus(mix): {mixed_topo_bonus:.2f}x | Veg-Faktor: {veg_factor:.2f}x"
+                    f"| Topo(mix): {mixed_topo:.2f}x | Veg: {veg_factor:.2f}x"
                 )
         if H <= 0 and h_is_estimated:
             data_warnings.append(
@@ -505,15 +546,14 @@ def calculate_thermal_profile(
     dt_excess = 0.0
     
     if not parcel_found_instability and H > 30:
-        # Berechne solaren Überschuss
-        # ROBUSTNESS-CAP: Max 2.5°C Überhitzung für typisches Gelände (Flachland/Voralpen).
-        # Zu grosse Überhitzung erzeugte unrealistisch hohe m/s Werte.
-        # Schneedecke-Sonderfall: Schnee kann nicht wärmer als 0°C werden (keine Puffer-Überhitzung)
+        # Berechne solaren Überschuss (aus Config)
+        solar_max = _get_thermal_param("solar_excess_max_C", timestamp, default=1.5)
+        solar_div = _get_thermal_param("solar_excess_H_divisor", timestamp, default=200)
         if snow_depth is not None and snow_depth > 0.05:
             dt_excess = 0.0
             data_warnings.append("Keine solare Überhitzung möglich wegen Schneedecke.")
         else:
-            dt_excess = min(2.5, H / 150.0)
+            dt_excess = min(solar_max, H / solar_div)
             
         heated_start = start_temp + dt_excess
         
@@ -545,8 +585,9 @@ def calculate_thermal_profile(
             else:
                 parcel_temp_h -= DALR * dh
             
-            # Entrainment (schwächer als Standard, da Thermikkern)
-            mu_light = MU * 0.5  # Halber Entrainment für kräftige Thermikblasen
+            # Entrainment für 2. Aufstieg (aus Config, Default = voller Wert)
+            mu_factor = _get_thermal_param("second_ascent_entrainment_factor", timestamp, default=1.0)
+            mu_light = MU * mu_factor
             parcel_temp_h -= mu_light * (parcel_temp_h - env_temp) * dh
             
             ti = env_temp - parcel_temp_h
@@ -573,29 +614,44 @@ def calculate_thermal_profile(
             f"→ Parcel-BLH={z_i_parcel:.0f}m AGL"
         )
     
-    # Modell-BLH als Plausibilitäts-Check (nicht mehr primär)
-    if boundary_layer_height_agl is not None and boundary_layer_height_agl > 100:
-        blh_msl = elevation_m + boundary_layer_height_agl
-        parcel_zi = max_thermal_height - elevation_m
-        
-        if parcel_zi > 100:
-            # Parcel hat selbst eine BLH gefunden → begrenzen falls Modell-BLH niedriger
-            if max_thermal_height > blh_msl * 1.5:
-                # Parcel deutlich höher als Modell → Modell-BLH als grosszügige Obergrenze (50% Toleranz)
-                # GFS unterschätzt die BLH massiv, daher erlauben wir 50% Abweichung nach oben.
-                max_thermal_height = int(blh_msl * 1.4)
-                data_warnings.append(
-                    f"BLH-Begrenzung: Parcel={parcel_zi:.0f}m > Modell={boundary_layer_height_agl:.0f}m AGL, "
-                    f"begrenzt auf {max_thermal_height - elevation_m:.0f}m AGL"
-                )
-        else:
-            # Parcel fand nichts, aber Modell hat BLH → als Fallback nutzen
-            if H > 20:
-                max_thermal_height = blh_msl
-                data_warnings.append(
-                    f"BLH-Fallback: Parcel fand keine Instabilität, "
-                    f"nutze Modell-BLH={boundary_layer_height_agl:.0f}m AGL"
-                )
+        # Wir nutzen surface_temp (benanntes Argument) und start_temp (lokale Variable)
+        blh_val = boundary_layer_height_agl
+
+        if surface_temp is not None and start_temp is not None and blh_val is not None:
+            # Modell-Feedback: Wo ist das Modell-Boden-Niveau?
+            # T2m bezieht sich auf Modell-Boden + 2m. start_temp ist auf elevation_m.
+            # Temp-Differenz -> Höhen-Differenz (ca. 0.8°C pro 100m)
+            dt_model = surface_temp - start_temp
+            # Wenn dt_model > 0, ist Modellboden tiefer. Wenn < 0, ist er höher.
+            model_elev_diff = dt_model / 0.008  
+            model_surface_msl = min(elevation_m, elevation_m - model_elev_diff)
+            
+            blh_msl = model_surface_msl + blh_val
+            
+            # Obergrenze: Falls Modellboden extrem tief geschätzt wird (z.B. >500m unter uns), deckeln
+            blh_msl = max(blh_msl, elevation_m + 100) # Mindestens 100m Steigen wenn Modell BLH liefert
+            
+            parcel_zi = max_thermal_height - elevation_m
+            
+            # Verbessertes Fallback: Wenn das Paket weniger als 250m steigt
+            # ODER die Parcel-Höhe weniger als die Hälfte der Modell-BLH beträgt,
+            # vertrauen wir dem Wettermodell eher als der Paketmethode.
+            if not (parcel_zi > 250 and max_thermal_height >= blh_msl * 0.5):
+                # Fallback nutzen
+                if H > 20:
+                    max_thermal_height = blh_msl
+                    data_warnings.append(
+                        f"BLH-Fallback: Parcel-BLH ({parcel_zi:.0f}m) zu niedrig, "
+                        f"nutze Modell-BLH={blh_val:.0f}m AGL"
+                    )
+            else:
+                # Parcel hat selbst eine BLH gefunden → begrenzen falls Modell-BLH deutlich niedriger
+                if max_thermal_height > blh_msl * 1.5:
+                    max_thermal_height = int(blh_msl * 1.4)
+                    data_warnings.append(
+                        f"BLH-Begrenzung: Parcel={parcel_zi:.0f}m > Modell={blh_val:.0f}m AGL, "
+                        f"begrenzt auf {max_thermal_height - elevation_m:.0f}m AGL"
+                    )
     
     # H-basierte Fallback-Schaetzung der Thermiktiefe
     # Greift wenn weder Parcel noch BLH verfügbar, aber Sonne heizt.
@@ -620,8 +676,8 @@ def calculate_thermal_profile(
     # tatsächliche Steigrate des Gleitschirms, der versucht die besten Kerne zu zentrieren.
     # Physikalisch: Ein Gleitschirm erzielt typischerweise ~50% der theoretischen w* Geschwindigkeit
     # wegen Eigensinken im Kreisflug (-1.0m/s bis -1.5m/s) und unperfekter Zentrierung.
-    CLIMB_FACTOR = 0.50
-    
+    CLIMB_FACTOR = _get_thermal_param("climb_factor", timestamp, default=0.50)
+
     T_kelvin = start_temp + 273.15
     z_i = max_thermal_height - elevation_m
 
@@ -662,29 +718,29 @@ def calculate_thermal_profile(
             raw_w_star = 0.0
 
         # Kalibrierungsfaktor: w* -> reales Gleitschirm-Steigen
-        # ROBUSTNESS-DAMPENING: Extrem starke Thermik (>3 m/s) ist sehr turbulent 
-        # und kann vom Piloten nicht mehr perfekt zentriert ausgekurbelt werden.
-        # Wir dämpfen den Faktor bei absurd hohen w* Werten leicht ab.
-        if raw_w_star > 4.0:
-            climb_factor = max(0.40, CLIMB_FACTOR - (raw_w_star - 4.0) * 0.05)
+        damping_threshold = _get_thermal_param("climb_factor_damping_threshold", timestamp, default=4.0)
+        if raw_w_star > damping_threshold:
+            climb_factor = max(0.40, CLIMB_FACTOR - (raw_w_star - damping_threshold) * 0.05)
         else:
             climb_factor = CLIMB_FACTOR
-            
+
         avg_climb = raw_w_star * climb_factor
 
-        # --- Updraft-Blending: DWD-Modellthermik einmischen ---
-        if updraft is not None and updraft > 0:
-            # Skalierung: Gittermittel → Thermikkern
-            dwd_climb = updraft * 4.0 * CLIMB_FACTOR
-            blended = 0.70 * avg_climb + 0.30 * dwd_climb
-            if blended > avg_climb:
-                avg_climb = blended
-                data_warnings.append(
-                    f"Updraft-Blending angehoben: DWD={dwd_climb:.1f} m/s → {avg_climb:.1f} m/s"
-                )
+        # DWD-Updraft-Blending (Default: deaktiviert — keine physikalische Grundlage für Skalierung)
+        if _get_thermal_param("use_dwd_updraft_blending", timestamp, default=False):
+            if updraft is not None and updraft > 0:
+                dwd_scale = _get_thermal_param("dwd_updraft_scale", timestamp, default=2.0)
+                dwd_climb = updraft * dwd_scale * CLIMB_FACTOR
+                blended = 0.70 * avg_climb + 0.30 * dwd_climb
+                if blended > avg_climb:
+                    avg_climb = blended
+                    data_warnings.append(
+                        f"Updraft-Blending: DWD={dwd_climb:.1f} m/s → {avg_climb:.1f} m/s"
+                    )
 
-        # Absolute Hard-Cap für Voralpen
-        avg_climb = min(4.5, avg_climb)
+        # Absolute Hard-Cap
+        hard_cap = _get_thermal_param("climb_hard_cap", timestamp, default=4.5)
+        avg_climb = min(hard_cap, avg_climb)
 
     # =========================================================================
     # 7. BEWERTUNG (Rating 0-10)

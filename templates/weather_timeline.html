@@ -54,35 +54,60 @@
             transition: all 0.3s ease;
         }
 
-        .hero-banner.flyable {
+        .hero-banner.cat-legendary {
+            background: linear-gradient(135deg, rgba(168, 85, 247, 0.25) 0%, rgba(147, 51, 234, 0.15) 100%);
+            border: 2px solid rgba(168, 85, 247, 0.4);
+            box-shadow: 0 0 40px rgba(168, 85, 247, 0.15);
+        }
+
+        .hero-banner.cat-good {
             background: linear-gradient(135deg, rgba(16, 185, 129, 0.25) 0%, rgba(5, 150, 105, 0.15) 100%);
             border: 2px solid rgba(16, 185, 129, 0.4);
             box-shadow: 0 0 40px rgba(16, 185, 129, 0.15);
         }
 
-        .hero-banner.not-flyable {
-            background: linear-gradient(135deg, rgba(239, 68, 68, 0.25) 0%, rgba(185, 28, 28, 0.15) 100%);
-            border: 2px solid rgba(239, 68, 68, 0.4);
-            box-shadow: 0 0 40px rgba(239, 68, 68, 0.15);
+        .hero-banner.cat-flyable {
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.25) 0%, rgba(37, 99, 235, 0.15) 100%);
+            border: 2px solid rgba(59, 130, 246, 0.3);
+            box-shadow: 0 0 30px rgba(59, 130, 246, 0.1);
         }
 
-        .hero-banner.no-data {
-            background: linear-gradient(135deg, rgba(100, 116, 139, 0.25) 0%, rgba(71, 85, 105, 0.15) 100%);
-            border: 2px solid rgba(100, 116, 139, 0.3);
+        .hero-banner.cat-caution {
+            background: linear-gradient(135deg, rgba(245, 158, 11, 0.25) 0%, rgba(217, 119, 6, 0.15) 100%);
+            border: 2px solid rgba(245, 158, 11, 0.4);
+            box-shadow: 0 0 40px rgba(245, 158, 11, 0.15);
+        }
+
+        .hero-banner.cat-dangerous {
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.3) 0%, rgba(185, 28, 28, 0.2) 100%);
+            border: 2px solid rgba(239, 68, 68, 0.5);
+            box-shadow: 0 0 40px rgba(239, 68, 68, 0.2);
         }
 
         .hero-status {
-            font-size: 42px;
+            font-size: 48px;
             font-weight: 900;
             letter-spacing: 2px;
             text-transform: uppercase;
         }
 
-        .hero-banner.flyable .hero-status {
+        .hero-banner.cat-legendary .hero-status {
+            color: #D8B4FE;
+        }
+
+        .hero-banner.cat-good .hero-status {
             color: #34D399;
         }
 
-        .hero-banner.not-flyable .hero-status {
+        .hero-banner.cat-flyable .hero-status {
+            color: #93C5FD;
+        }
+
+        .hero-banner.cat-caution .hero-status {
+            color: #FBBF24;
+        }
+
+        .hero-banner.cat-dangerous .hero-status {
             color: #F87171;
         }
 
@@ -231,6 +256,11 @@
             display: block;
         }
 
+        /* ========== SUBSCRIBE MSG ========== */
+        .subscribe-msg { margin-top:8px; font-size:13px; display:none; }
+        .subscribe-msg.success { display:block; color:#10B981; }
+        .subscribe-msg.error { display:block; color:#EF4444; }
+
         /* ========== HOURLY GRID ========== */
         .hourly-grid-container {
             background: var(--color-card);
@@ -293,9 +323,19 @@
             margin: 0 auto;
         }
 
+        .ampel-purple {
+            background: linear-gradient(90deg, #A855F7, #C084FC);
+            box-shadow: 0 0 8px rgba(168, 85, 247, 0.5);
+        }
+
         .ampel-green {
             background: linear-gradient(90deg, #10B981, #34D399);
             box-shadow: 0 0 8px rgba(16, 185, 129, 0.5);
+        }
+
+        .ampel-blue {
+            background: linear-gradient(90deg, #3B82F6, #60A5FA);
+            box-shadow: 0 0 8px rgba(59, 130, 246, 0.5);
         }
 
         .ampel-yellow {
@@ -349,8 +389,16 @@
             border-radius: 3px;
         }
 
+        .bg-purple {
+            background-color: rgba(168, 85, 247, 0.08);
+        }
+
         .bg-green {
             background-color: rgba(16, 185, 129, 0.06);
+        }
+
+        .bg-blue {
+            background-color: rgba(96, 165, 250, 0.06);
         }
 
         .bg-yellow {
@@ -420,84 +468,7 @@
             font-weight: 500;
         }
 
-        /* ========== FÖHN INDICATOR ========== */
-        .foehn-box {
-            background: var(--color-card);
-            backdrop-filter: blur(12px);
-            border: 1px solid var(--glass-border);
-            border-radius: 20px;
-            padding: 16px 20px;
-            margin-bottom: 24px;
-            box-shadow: var(--shadow-lg);
-            display: flex;
-            align-items: center;
-            gap: 16px;
-            flex-wrap: wrap;
-        }
 
-        .foehn-box.none {
-            border-left: 4px solid #64748B;
-            background: rgba(100, 116, 139, 0.08);
-        }
-
-        .foehn-box.caution {
-            border-left: 4px solid var(--color-warning);
-            background: rgba(245, 158, 11, 0.12);
-        }
-
-        .foehn-box.danger {
-            border-left: 4px solid var(--color-danger);
-            background: rgba(239, 68, 68, 0.12);
-        }
-
-        .foehn-icon {
-            font-size: 28px;
-            line-height: 1;
-        }
-
-        .foehn-box.none .foehn-icon {
-            color: #64748B;
-        }
-
-        .foehn-box.caution .foehn-icon {
-            color: var(--color-warning);
-        }
-
-        .foehn-box.danger .foehn-icon {
-            color: var(--color-danger);
-        }
-
-        .foehn-content {
-            flex: 1;
-            min-width: 200px;
-        }
-
-        .foehn-label {
-            font-size: 14px;
-            font-weight: 700;
-            margin-bottom: 4px;
-        }
-
-        .foehn-message {
-            font-size: 12px;
-            color: var(--color-text-light);
-            line-height: 1.5;
-        }
-
-        .foehn-details {
-            font-size: 11px;
-            color: var(--color-text-light);
-            margin-top: 8px;
-            display: flex;
-            gap: 12px;
-            flex-wrap: wrap;
-        }
-
-        .foehn-details span {
-            background: rgba(255, 255, 255, 0.06);
-            padding: 4px 8px;
-            border-radius: 6px;
-        }
 
         /* ========== TOOLTIP ========== */
         .tooltip {
@@ -676,7 +647,7 @@
             <div class="hero-status" id="hero-status">Keine Daten vorhanden</div>
             <div class="hero-meta" id="hero-meta" style="display:none;">
                 <div class="hero-rating" id="hero-rating"></div>
-                <span class="hero-conditions" id="hero-conditions"></span>
+                <!-- hero-conditions removed, integrated into hero-status -->
             </div>
             <div class="hero-summary" id="hero-summary">Klicke oben auf "Daten aktualisieren" um Wetterdaten abzurufen
             </div>
@@ -689,28 +660,7 @@
             </div>
         </div>
 
-        <!-- THERMAL OVERVIEW BADGE -->
-        <div id="thermal-overview"
-            style="display:none; background: var(--color-card); backdrop-filter: blur(12px); border: 1px solid var(--glass-border); border-radius: 16px; padding: 14px 20px; margin-bottom: 24px; box-shadow: var(--shadow-lg);">
-            <div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
-                <div style="font-size:28px;" id="thermal-icon">☀️</div>
-                <div style="flex:1; min-width:200px;">
-                    <div style="font-size:14px; font-weight:700; margin-bottom:4px;" id="thermal-label">Thermik</div>
-                    <div style="font-size:12px; color:var(--color-text-light); line-height:1.5;" id="thermal-detail">
-                    </div>
-                </div>
-                <div style="display:flex; gap:12px; flex-wrap:wrap;">
-                    <div style="text-align:center;">
-                        <div style="font-size:24px; font-weight:900;" id="thermal-climb">-</div>
-                        <div style="font-size:11px; color:var(--color-text-light);">m/s Peak</div>
-                    </div>
-                    <div style="text-align:center;">
-                        <div style="font-size:24px; font-weight:900;" id="thermal-rating-val">-</div>
-                        <div style="font-size:11px; color:var(--color-text-light);">Rating</div>
-                    </div>
-                </div>
-            </div>
-        </div>
+
 
         <!-- NAV BAR -->
         <div class="nav-bar">
@@ -737,14 +687,17 @@
             <div class="update-message" id="update-message"></div>
         </div>
 
-        <!-- FÖHN INDICATOR -->
-        <div class="foehn-box none" id="foehn-box" style="display:none;">
-            <div class="foehn-icon" id="foehn-icon">💨</div>
-            <div class="foehn-content">
-                <div class="foehn-label" id="foehn-label">Föhn</div>
-                <div class="foehn-message" id="foehn-message"></div>
-                <div class="foehn-details" id="foehn-details"></div>
-            </div>
+        <!-- E-MAIL ABO -->
+        <div style="margin:24px 0;padding:20px;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:12px;">
+            <div style="font-size:15px;font-weight:700;margin-bottom:8px;color:var(--color-text);">Flugwetter per E-Mail erhalten</div>
+            <div style="font-size:12px;color:var(--color-text-light);margin-bottom:12px;">Erhalte automatische Benachrichtigungen mit der aktuellen Flugwetter-Analyse.</div>
+            <form id="subscribe-form" style="display:flex;gap:8px;flex-wrap:wrap;">
+                <input type="email" id="subscribe-email" placeholder="deine@email.ch" required
+                    style="flex:1;min-width:200px;padding:10px 14px;border-radius:8px;border:1px solid var(--glass-border);background:rgba(15,23,42,0.6);color:var(--color-text);font-size:14px;outline:none;">
+                <button type="submit" id="subscribe-btn"
+                    style="padding:10px 20px;background:var(--color-primary);color:white;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;text-transform:uppercase;letter-spacing:0.5px;">Anmelden</button>
+            </form>
+            <div id="subscribe-message" class="subscribe-msg"></div>
         </div>
 
         <!-- EVALUATION DETAILS -->
@@ -772,7 +725,13 @@
 
         <!-- HOURLY GRID -->
         <div class="hourly-grid-container">
-            <div class="hourly-grid-title">Stunden-Übersicht</div>
+            <div class="hourly-grid-title" style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                Stunden-Übersicht
+                <span id="nordfoehn-indicator"
+                    style="display:none; font-size:12px; font-weight:700; padding:4px 10px; border-radius:8px; cursor:default;"></span>
+                <span id="suedfoehn-indicator"
+                    style="display:none; font-size:12px; font-weight:700; padding:4px 10px; border-radius:8px; cursor:default;"></span>
+            </div>
             <div class="hourly-grid" id="hourly-grid"></div>
         </div>
 
@@ -786,6 +745,7 @@
     <script>
         let weatherData = null;
         let evaluationData = null;
+        let foehnHourlyData = [];
         let currentDate = null;
         let availableDates = [];
         let allowedWindRange = null;
@@ -833,7 +793,13 @@
         }
 
         const conditionColors = {
-            EXCELLENT: '#10B981', GOOD: '#34D399', MODERATE: '#F59E0B', POOR: '#F87171', DANGEROUS: '#EF4444'
+            LEGENDARY: '#A855F7', GOOD: '#10B981', FLYABLE: '#60A5FA', CAUTION: '#F59E0B', DANGEROUS: '#EF4444',
+            // Legacy-Kompatibilität
+            EXCELLENT: '#A855F7', MODERATE: '#F59E0B', POOR: '#F87171'
+        };
+        const conditionLabels = {
+            LEGENDARY: 'LEGENDÄR', GOOD: 'GUT', FLYABLE: 'FLIEGBAR', CAUTION: 'AUFPASSEN', DANGEROUS: 'GEFÄHRLICH',
+            EXCELLENT: 'LEGENDÄR', MODERATE: 'AUFPASSEN', POOR: 'GEFÄHRLICH'
         };
 
         // ========== DATA LOADING ==========
@@ -846,10 +812,8 @@
                 const evalResult = await evalResp.json();
                 const foehnResult = await foehnResp.json();
 
-                if (foehnResult.success && foehnResult.foehn) {
-                    displayFoehn(foehnResult.foehn);
-                } else {
-                    document.getElementById('foehn-box').style.display = 'none';
+                if (foehnResult.success && foehnResult.hourly) {
+                    foehnHourlyData = foehnResult.hourly;
                 }
 
                 if (weatherResult.success) {
@@ -884,7 +848,6 @@
 
         function updateAll(date) {
             buildHourlyGrid(date);
-            displayThermalOverview(date);
             if (evaluationData?.[date]) {
                 displayHeroBanner(evaluationData[date]);
                 displayEvaluation(evaluationData[date]);
@@ -919,28 +882,7 @@
                 `${data.location.name} \u2022 Startrichtung: ${data.location.windrichtung} \u2022 ${h.start}\u2013${h.end} Uhr`;
         }
 
-        function displayFoehn(foehn) {
-            const box = document.getElementById('foehn-box');
-            const icon = document.getElementById('foehn-icon');
-            const label = document.getElementById('foehn-label');
-            const message = document.getElementById('foehn-message');
-            const details = document.getElementById('foehn-details');
 
-            box.className = 'foehn-box ' + (foehn.level || 'none');
-            box.style.display = 'flex';
-
-            const icons = { none: '\uD83C\uDF2A', caution: '\u26A0\uFE0F', danger: '\u26A0\uFE0F' };
-            icon.textContent = icons[foehn.level] || icons.none;
-
-            label.textContent = 'F\u00F6hn: ' + (foehn.label || 'Kein F\u00F6hn');
-            message.textContent = foehn.message || '';
-
-            const parts = [];
-            if (foehn.delta_p_hpa != null) parts.push('\u0394P: ' + foehn.delta_p_hpa + ' hPa');
-            if (foehn.crest_wind_kmh != null) parts.push('700hPa: ' + foehn.crest_wind_kmh + ' km/h');
-            if (foehn.humidity_nord != null) parts.push('LF: ' + foehn.humidity_nord + '%');
-            details.innerHTML = parts.map(p => '<span>' + p + '</span>').join('');
-        }
 
         // ========== HERO BANNER ==========
         function displayHeroBanner(ev) {
@@ -956,20 +898,28 @@
             const summary = document.getElementById('hero-summary');
             const conf = document.getElementById('hero-confidence');
 
-            banner.className = 'hero-banner ' + (ev.flyable ? 'flyable' : 'not-flyable');
-            status.textContent = ev.flyable ? 'FLIEGBAR' : 'NICHT FLIEGBAR';
+            const categoryClass = 'cat-' + (ev.conditions || 'flyable').toLowerCase();
+            banner.className = 'hero-banner ' + categoryClass;
+
+            status.textContent = conditionLabels[ev.conditions] || (ev.flyable ? 'FLIEGBAR' : 'NICHT FLIEGBAR');
             meta.style.display = 'flex';
             rating.innerHTML = (ev.rating || 0) + '<small>/10</small>';
-            const c = conditionColors[ev.conditions] || '#94A3B8';
-            cond.textContent = ev.conditions || '-';
-            cond.style.background = `rgba(${hexToRgb(c)}, 0.2)`;
-            cond.style.color = c;
-            cond.style.border = `1px solid rgba(${hexToRgb(c)}, 0.4)`;
-            summary.textContent = ev.summary || '';
-            conf.style.display = 'flex';
-            const confidenceVal = ev.confidence || 0;
-            document.getElementById('hero-confidence-fill').style.width = (confidenceVal * 10) + '%';
-            document.getElementById('hero-confidence-val').textContent = confidenceVal + '/10';
+
+            // day_summary / summary + golden_window
+            let summaryText = ev.day_summary || ev.summary || '';
+            if (ev.golden_window && ev.golden_window !== 'null') {
+                summaryText += ' \u2728 Golden Window: ' + ev.golden_window;
+            }
+            summary.textContent = summaryText;
+
+            // Confidence (optional - may not be present in new format)
+            if (ev.confidence && ev.confidence > 0) {
+                conf.style.display = 'flex';
+                document.getElementById('hero-confidence-fill').style.width = (ev.confidence * 10) + '%';
+                document.getElementById('hero-confidence-val').textContent = ev.confidence + '/10';
+            } else {
+                conf.style.display = 'none';
+            }
         }
 
         function resetHeroBanner() {
@@ -997,55 +947,7 @@
             document.getElementById('recommendation').textContent = ev.recommendation || '-';
         }
 
-        // ========== THERMAL OVERVIEW ==========
-        function displayThermalOverview(date) {
-            const box = document.getElementById('thermal-overview');
-            if (!box || !weatherData?.thermal_overview?.[date]) {
-                if (box) box.style.display = 'none';
-                return;
-            }
-            const t = weatherData.thermal_overview[date];
-            const climb = t.peak_climb || 0;
-            const rating = t.peak_rating || 0;
-            const bestHour = t.best_hour ? new Date(t.best_hour).getHours() + ':00' : '-';
 
-            // Anzeige
-            document.getElementById('thermal-climb').textContent = climb.toFixed(1);
-            document.getElementById('thermal-rating-val').textContent = rating + '/10';
-
-            // Farbe
-            const icon = document.getElementById('thermal-icon');
-            const label = document.getElementById('thermal-label');
-            const detail = document.getElementById('thermal-detail');
-
-            if (climb >= 2.0) {
-                icon.textContent = '🔥';
-                label.textContent = 'Starke Thermik';
-                label.style.color = '#34D399';
-                document.getElementById('thermal-climb').style.color = '#34D399';
-                box.style.borderLeft = '4px solid #10B981';
-            } else if (climb >= 1.0) {
-                icon.textContent = '☀️';
-                label.textContent = 'Moderate Thermik';
-                label.style.color = '#FBBF24';
-                document.getElementById('thermal-climb').style.color = '#FBBF24';
-                box.style.borderLeft = '4px solid #F59E0B';
-            } else if (climb > 0) {
-                icon.textContent = '⛅';
-                label.textContent = 'Schwache Thermik';
-                label.style.color = '#94A3B8';
-                document.getElementById('thermal-climb').style.color = '#94A3B8';
-                box.style.borderLeft = '4px solid #64748B';
-            } else {
-                icon.textContent = '☁️';
-                label.textContent = 'Keine Thermik';
-                label.style.color = '#64748B';
-                document.getElementById('thermal-climb').style.color = '#64748B';
-                box.style.borderLeft = '4px solid #334155';
-            }
-            detail.textContent = `Ø ${(t.avg_climb || 0).toFixed(1)} m/s · Beste Stunde: ${bestHour}`;
-            box.style.display = 'block';
-        }
 
         // ========== HOURLY GRID ==========
         function buildHourlyGrid(date) {
@@ -1084,6 +986,30 @@
             const cols = hours.length + 1; // +1 for label column
             container.style.gridTemplateColumns = `70px repeat(${hours.length}, 1fr)`;
 
+
+
+            // Hole LLM-Bewertungen für diesen Tag
+            const evaluation = evaluationData?.evaluations?.[date];
+            const hourlyEvaluations = evaluation?.hourly_evaluations || [];
+
+            // Mapping-Funktion: conditions → CSS-Klasse (5 Stufen)
+            function mapLLMConditionsToColor(conditions, rating) {
+                const cond = (conditions || '').toUpperCase();
+                if (cond === 'LEGENDARY' || cond === 'EXCELLENT') return 'purple';
+                if (cond === 'GOOD') return 'green';
+                if (cond === 'FLYABLE') return 'blue';
+                if (cond === 'CAUTION' || cond === 'MODERATE') return 'yellow';
+                if (cond === 'DANGEROUS' || cond === 'POOR') return 'red';
+                return null;
+            }
+
+            // Erstelle Map von Stunde → LLM-Bewertung
+            const hourlyEvalMap = {};
+            hourlyEvaluations.forEach(eval => {
+                const hour = eval.hour;
+                hourlyEvalMap[hour] = eval;
+            });
+
             const rows = [
                 { label: 'Uhrzeit', key: 'hour' },
                 { label: 'Status', key: 'ampel' },
@@ -1095,32 +1021,8 @@
                 { label: 'Regen', key: 'rain' }
             ];
 
-            // Hole LLM-Bewertungen für diesen Tag
-            const evaluation = evaluationData?.evaluations?.[date];
-            const hourlyEvaluations = evaluation?.hourly_evaluations || [];
-
-            // Mapping-Funktion: LLM conditions → CSS-Klasse
-            function mapLLMConditionsToColor(conditions, rating) {
-                const cond = (conditions || '').toUpperCase();
-                if (cond === 'EXCELLENT' || cond === 'GOOD') {
-                    return 'green';
-                } else if (cond === 'MODERATE') {
-                    return 'yellow';
-                } else if (cond === 'POOR') {
-                    // Bei POOR: rating < 5 → rot, sonst gelb
-                    return (rating && rating < 5) ? 'red' : 'yellow';
-                } else if (cond === 'DANGEROUS') {
-                    return 'red';
-                }
-                return null; // Fallback zu alter Funktion
-            }
-
-            // Erstelle Map von Stunde → LLM-Bewertung
-            const hourlyEvalMap = {};
-            hourlyEvaluations.forEach(eval => {
-                const hour = eval.hour;
-                hourlyEvalMap[hour] = eval;
-            });
+            // Föhn-Indikator für den ganzen Tag aktualisieren
+            displayFoehnIndicator(date);
 
             // Compute flyability per hour - verwende LLM-Bewertungen wenn verfügbar
             const flyColors = hours.map(h => {
@@ -1229,6 +1131,100 @@
             });
         }
 
+        // ========== FÖHN INDICATOR (Tag-Level) ==========
+        function displayFoehnIndicator(date) {
+            const indNord = document.getElementById('nordfoehn-indicator');
+            const indSued = document.getElementById('suedfoehn-indicator');
+            if (!indNord || !indSued) return;
+
+            const levelOrder = { none: 0, caution: 1, danger: 2 };
+
+            let worstNordLevel = 'none';
+            let worstNordEntry = null;
+            let worstSuedLevel = 'none';
+            let worstSuedEntry = null;
+
+            if (foehnHourlyData && foehnHourlyData.length > 0) {
+                foehnHourlyData.forEach(fh => {
+                    if (fh.time && fh.time.startsWith(date)) {
+                        // Ermittle die Richtung aus dem Label oder Message (da wir direction in JS noch nicht explizit haben, parsen wir es aus der Message/Label oder wir nutzen das delta_p Vorzeichen)
+                        // Besser: Nutze delta_p_hpa: positiv = Südföhn, negativ = Nordföhn (gemäss foehn_indicators.py)
+                        let isNord = false;
+                        let isSued = false;
+
+                        // Wenn der Indikator direkt die Richtung mitliefert (wird im backend hinzugefügt):
+                        if (fh.direction === 'Nord') isNord = true;
+                        else if (fh.direction === 'Süd') isSued = true;
+                        else {
+                            // Fallback falls 'direction' nicht da ist: anhand von Indikator-Texten schätzen
+                            if (fh.message && fh.message.toLowerCase().includes('nord')) isNord = true;
+                            if (fh.message && fh.message.toLowerCase().includes('süd')) isSued = true;
+                        }
+
+                        if (isNord) {
+                            if ((levelOrder[fh.level] || 0) > (levelOrder[worstNordLevel] || 0)) {
+                                worstNordLevel = fh.level;
+                                worstNordEntry = fh;
+                            }
+                        } else if (isSued) {
+                            if ((levelOrder[fh.level] || 0) > (levelOrder[worstSuedLevel] || 0)) {
+                                worstSuedLevel = fh.level;
+                                worstSuedEntry = fh;
+                            }
+                        }
+                    }
+                });
+            }
+
+            // --- NORD FÖHN INDICATOR ---
+            if (worstNordLevel !== 'none') {
+                indNord.style.display = 'inline-block';
+                if (worstNordLevel === 'danger') {
+                    indNord.textContent = '🚨 Nordföhn aktiv';
+                    indNord.style.background = 'rgba(239, 68, 68, 0.2)';
+                    indNord.style.color = '#F87171';
+                    indNord.style.border = '1px solid rgba(239, 68, 68, 0.4)';
+                } else if (worstNordLevel === 'caution') {
+                    indNord.textContent = '⚠️ Nordföhn möglich';
+                    indNord.style.background = 'rgba(245, 158, 11, 0.2)';
+                    indNord.style.color = '#FBBF24';
+                    indNord.style.border = '1px solid rgba(245, 158, 11, 0.4)';
+                }
+                indNord.title = (worstNordEntry?.label || 'Warnung') + ' (Nordföhn)';
+            } else {
+                indNord.style.display = 'none';
+            }
+
+            // --- SÜD FÖHN INDICATOR ---
+            if (worstSuedLevel !== 'none') {
+                indSued.style.display = 'inline-block';
+                if (worstSuedLevel === 'danger') {
+                    indSued.textContent = '🚨 Südföhn aktiv';
+                    indSued.style.background = 'rgba(239, 68, 68, 0.2)';
+                    indSued.style.color = '#F87171';
+                    indSued.style.border = '1px solid rgba(239, 68, 68, 0.4)';
+                } else if (worstSuedLevel === 'caution') {
+                    indSued.textContent = '⚠️ Südföhn möglich';
+                    indSued.style.background = 'rgba(245, 158, 11, 0.2)';
+                    indSued.style.color = '#FBBF24';
+                    indSued.style.border = '1px solid rgba(245, 158, 11, 0.4)';
+                }
+                indSued.title = (worstSuedEntry?.label || 'Warnung') + ' (Südföhn)';
+            } else {
+                indSued.style.display = 'none';
+            }
+
+            // Wenn beide 'none' sind, zeige einen generischen an
+            if (worstNordLevel === 'none' && worstSuedLevel === 'none') {
+                indNord.style.display = 'inline-block';
+                indNord.textContent = '✅ Kein Föhn';
+                indNord.style.background = 'rgba(16, 185, 129, 0.2)';
+                indNord.style.color = '#34D399';
+                indNord.style.border = '1px solid rgba(16, 185, 129, 0.4)';
+                indNord.title = 'Keine Föhn-Anzeichen';
+            }
+        }
+
         // ========== TRIGGER UPDATE ==========
         document.getElementById('trigger-update-btn').addEventListener('click', async function () {
             const btn = this;
@@ -1310,6 +1306,43 @@
         });
 
         loadData();
+
+        // ========== E-MAIL ABO ==========
+        document.getElementById('subscribe-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const emailInput = document.getElementById('subscribe-email');
+            const msg = document.getElementById('subscribe-message');
+            const btn = document.getElementById('subscribe-btn');
+            const email = emailInput.value.trim();
+            if (!email) return;
+
+            btn.disabled = true;
+            btn.textContent = '...';
+            msg.textContent = '';
+            msg.className = 'subscribe-msg';
+
+            try {
+                const resp = await fetch('/api/subscribe', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({email: email})
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    msg.textContent = data.message;
+                    msg.className = 'subscribe-msg success';
+                    emailInput.value = '';
+                } else {
+                    msg.textContent = data.error || 'Fehler';
+                    msg.className = 'subscribe-msg error';
+                }
+            } catch(err) {
+                msg.textContent = 'Netzwerkfehler';
+                msg.className = 'subscribe-msg error';
+            }
+            btn.disabled = false;
+            btn.textContent = 'Anmelden';
+        });
     </script>
 </body>
 

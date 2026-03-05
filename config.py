@@ -17,7 +17,10 @@ LOCATION = {
     "windrichtung": "N-O",
     "slope_azimuth": 225,  # SW-Ausrichtung des Hangkamms (für generelle Sonneneinstrahlung)
     "slope_angle": 30,     # ca. 30 Grad Hangneigung
-    "bemerkung": "Benötigt gewisse Windstärke da man hier Soaren muss, ab 15km/h kann man Erfahrungsgemäss am Uetliberg gut fliegen ab 20km/h hat man sehr gute windstärke, wenn dann Thermikbedingungen gut sind hat man gute bedingungen, der Wind ist grundsätzlich aber ab 30km/h zu stark, dies sind jedoch keine Grenzwerte sondern müssen immer beurteilt werden"
+    "ideal_wind_min_kmh": 15, # Minimum Windgeschwindigkeit damit Thermik am Hang funktioniert
+    "ideal_wind_max_kmh": 30, # Maximale gute Windgeschwindigkeit (darüber wird es anspruchsvoll/böig)
+    "kritischer_foehn": "Süd", # Welcher Föhn flugtechnisch gefährlich ist ("Süd", "Nord", "Beide")
+    "bemerkung": "Am Uetliberg wird nicht klassisch gesoart – der Wind drückt die Thermik an den Hang, wodurch man in der hangnahen Thermik fliegt. Ab 15km/h funktioniert das gut, ab 20km/h hat man sehr gute Bedingungen. Bei guter Thermik plus passendem Wind hat man Top-Bedingungen. Ab 30km/h wird es grundsätzlich zu stark (Richtwerte, situationsabhängig)."
 }
 
 # ============================================================================
@@ -89,6 +92,7 @@ def get_evaluations_json_path():
 
 HOURLY_PARAMS = [
     "temperature_2m",
+    "relative_humidity_2m",
     "cloud_base",
     "wind_speed_10m",
     "wind_direction_10m",
@@ -149,112 +153,234 @@ for _level in PRESSURE_LEVELS:
 
 
 # ============================================================================
+# THERMIK-BERECHNUNGS-PARAMETER
+# ============================================================================
+# Physikalisch herleitbare Koeffizienten für die Thermik-Berechnung.
+# Jahreszeitabhängige Werte sind als 4 Jahreszeiten konfiguriert:
+#   "winter" = Dez-Feb, "spring" = Mrz-Mai, "summer" = Jun-Aug, "autumn" = Sep-Nov
+
+THERMAL_PARAMS = {
+    # --- Strahlung → Sensibler Wärmefluss (H) ---
+    # Herleitung: Energiebilanz Rn = H + LE + G
+    #   Albedo Grasland ~0.20 → 80% absorbiert
+    #   Langwellige Abstrahlung ~50-100 W/m² Verlust → Rn ≈ 0.60-0.70 × SW
+    #   Bowen-Ratio H/LE für Mitteleuropa: 0.3-0.8 je nach Jahreszeit/Feuchte
+    #   → H ≈ 0.18-0.32 × Direktstrahlung
+    # Jahreszeitlich: Im Sommer trockener Boden → mehr H; Frühling feucht → weniger H
+    "direct_radiation_to_H": {
+        "winter": 0.22,   # Feuchter Boden, tiefe Sonne, hohe Albedo (evtl. Schnee)
+        "spring": 0.25,   # Feuchter Boden, Vegetation verdunstet stark
+        "summer": 0.30,   # Trockenerer Boden, höhere Bowen-Ratio
+        "autumn": 0.26,   # Abnehmende Verdunstung, aber kürzer Tage
+    },
+    "diffuse_radiation_to_H": {
+        "winter": 0.08,
+        "spring": 0.10,
+        "summer": 0.14,
+        "autumn": 0.11,
+    },
+    # Globalstrahlung-Fallback (wenn keine Direkt/Diffus-Trennung verfügbar)
+    "global_radiation_to_H": {
+        "winter": 0.15,
+        "spring": 0.18,
+        "summer": 0.22,
+        "autumn": 0.18,
+    },
+
+    # --- H Hard-Cap (W/m²) ---
+    # Gemessene Peak-H-Werte Mitteleuropa:
+    #   Winter: 50-120, Frühling: 100-200, Sommer: 200-300, Herbst: 100-180
+    # Uetliberg = bewaldeter Hügel, kein hochalpiner Fels
+    "H_cap": {
+        "winter": 150,
+        "spring": 220,
+        "summer": 300,
+        "autumn": 200,
+    },
+
+    # --- Topografie-Bonus ---
+    # Die geometrische Formel (cos_theta/sin_alpha) ist korrekt für die
+    # Strahlung auf den Hang. Aber: Erhöhte Hangstrahlung erzeugt primär
+    # lokalen Hangaufwind, nicht stärkere konvektive Thermik.
+    # Daher nur ein gedämpfter Anteil auf H anwenden.
+    "topo_bonus_max": 1.3,          # Max-Faktor (geometrisch bis 2.5, aber gedämpft)
+    "topo_bonus_H_fraction": 0.3,   # Nur 30% des Topo-Bonus wirkt auf H
+                                     # Rest ist Hangaufwind (separat)
+
+    # --- Solare Überhitzung ---
+    # Bodennah kann die Luft 1-3°C über 2m-Temperatur liegen.
+    # Für bewaldetes/grasbewachsenes Gelände konservativ.
+    "solar_excess_max_C": 1.5,      # Max Überhitzung in °C
+    "solar_excess_H_divisor": 200,   # dt_excess = min(max, H / divisor)
+
+    # --- Entrainment 2. Aufstieg ---
+    # Standard-MU = 0.0002 m⁻¹ (Literatur). Für den 2. Aufstieg mit
+    # überhitztem Paket verwenden wir den vollen Entrainment-Wert.
+    # Die Halbierung (0.5) hatte keine physikalische Grundlage.
+    "second_ascent_entrainment_factor": 0.75,  # Leicht reduziert für kräftigere Kerne
+
+    # --- Climb-Factor ---
+    # Eigensinken Gleitschirm im Kreis: ~1.0-1.5 m/s
+    # Plus imperfekte Zentrierung → ~50% von w* ist Erfahrungswert
+    "climb_factor": 0.50,
+    "climb_factor_damping_threshold": 4.0,  # Ab diesem raw_w* wird gedämpft
+    "climb_hard_cap": 4.5,                  # Absolute Obergrenze m/s
+
+    # --- DWD-Updraft-Blending ---
+    # ICON-D2 Updraft ist ein Gittermittel (2.2km). Skalierung ×2.0 ist
+    # konservative Annäherung an Thermikkern-Konzentration.
+    # Blending: 70% Parcel/Deardorff + 30% DWD (nur wenn DWD höher).
+    "use_dwd_updraft_blending": True,
+    "dwd_updraft_scale": 2.0,
+}
+
+
+# ============================================================================
 # LLM PROMPT-KONFIGURATION (für location_evaluator.py)
 # ============================================================================
 
 # System-Prompt für OpenAI GPT-4
 LLM_SYSTEM_PROMPT = """Du bist ein erfahrener Gleitschirm-Fluglehrer und Meteorologe mit 20+ Jahren Erfahrung in den Schweizer Alpen.
-Analysiere Wetterdaten für Gleitschirm-Startplätze und bewerte die Flugbarkeit.
+Analysiere Wetterdaten für den Uetliberg Startplatz (730m MSL) und bewerte die Flugbarkeit.
 
-WICHTIG WIND-ANALYSE:
+═══════════════════════════════════════════════
+ANALYSE-KASKADE (IMMER in dieser Reihenfolge!)
+═══════════════════════════════════════════════
+
+STUFE 1 — SICHERHEIT / STARTBARKEIT:
+Prüfe für jedes Zeitfenster zuerst:
+  • Böen >40 km/h → safety: "DANGEROUS", flyable: false, rating: 1
+  • Böen >30 km/h → safety: "CAUTION", flyable: kontextabhängig (Erfahrene evtl. ja)
+  • Wolkenbasis (Open-Meteo cloud_base) <1000m MSL → flyable: false (Nebel/Stratus am Hang, Startverbot)
+  • Wind-Scherung: >10 km/h Unterschied pro 500m Höhe → Turbulenz-Risiko
+  • Richtungsänderung >90° zwischen Höhenstufen → DANGEROUS
+  • FÖHN-CHECK: Wenn Föhn-Indikatoren mitgeliefert werden (Delta-P, Kammwind, Luftfeuchtigkeit):
+    - Delta-P ≥8 hPa ODER Kammwind ≥180 km/h aus S/SW → DANGEROUS, Flugverbot
+    - Delta-P ≥4 hPa ODER Kammwind ≥54 km/h aus S/SW → CAUTION
+    - Luftfeuchtigkeit <40% bei erhöhtem Delta-P → Föhn durchgebrochen, DANGEROUS
+Resultat: Wenn EINES dieser Kriterien zutrifft → flyable: false, rating 1-3, safety: "DANGEROUS"
+
+STUFE 2 — QUALITÄT / THERMIK (nur wenn Stufe 1 = "SAFE"):
+  • Nutze das THERMIK-PROXY-MODELL ("m/s" und "bis X m MSL") für das Rating.
+  • BEWERTE PRIMÄR NACH HÖHE ÜBER STARTPLATZ (Startplatz = 730m MSL):
+  
+    => FLYABLE (Abgleiter / Sicher): 
+       - Höhe über Startplatz: < 50m (max_height < 780m MSL) oder Wind < 15 km/h.
+       - Man sinkt bald zum Landeplatz. Rating: 4-6. (Setze flyable: true)
+       
+    => GOOD (Soaring / Kurbeln):
+       - Höhe über Startplatz: ~50m bis 300m (max_height zwischen 780m und 1030m MSL).
+       - Guter Wind (15-25 km/h) zum Halten am Hang, leichte Höhengewinne möglich.
+       - Rating: 7-8. (Setze flyable: true)
+       
+    => LEGENDARY (Streckenflug / Top Thermik):
+       - Höhe über Startplatz: > 300m (Ankunftshöhe meist bei 1500m bis 2000m MSL).
+       - Perfekte Bedingungen, um weit über den Startplatz zu steigen und in andere Regionen weiterzufliegen.
+       - Rating: 9-10. (Setze flyable: true)
+
+  • LCL (Basis) vs. Arbeitshöhe: Wenn Arbeitshöhe > LCL → Wolkenbasis limitiert.
+Resultat: Setze flyable: true (da sicher). Bestimme die Kategorie/Rating basierend auf den obigen 3 Stufen. (Sollte Stufe 1 ein Risiko gefunden haben, gilt Stufe 1: safety=DANGEROUS/CAUTION, flyable=false/true, Rating=1-3).
+
+WICHTIG: Bei flyable: false MUSS das reason-Feld ZUERST das Sicherheitsrisiko nennen, bevor Thermik erwähnt wird.
+
+═══════════════════════════════════════════════
+SEKTOR-ANALYSE (Kosten- & Token-Optimierung)
+═══════════════════════════════════════════════
+
+Erstelle KEINE starre stündliche Liste!
+Fasse aufeinanderfolgende Stunden mit ähnlicher Wetterlage zu logischen Zeitfenstern (Sektoren) zusammen.
+Typische Sektoren: "09:00-12:00" (Vormittag), "12:00-15:00" (Mittag), "15:00-18:00" (Nachmittag).
+Du darfst auch 1h-Sektoren bilden wenn sich die Lage schlagartig ändert.
+
+═══════════════════════════════════════════════
+WIND-ANALYSE (Thermik-Hang-Standort!)
+═══════════════════════════════════════════════
+
+Am Uetliberg wird NICHT klassisch gesoart! Der Wind drückt die Thermik an den Hang – Piloten fliegen in der hangnahen Thermik.
+Das heisst: Schwacher Wind ist NICHT ideal, da die Thermik ohne Wind nicht an den Hang gedrückt wird!
+- < 15 km/h: Zu schwach, Thermik wird nicht ausreichend an den Hang gedrückt (nur Abgleiter möglich, ausser bei extrem starker Thermik)
+- 15 - 20 km/h: Gute Bedingungen, Thermik wird am Hang konzentriert
+- 20 - 30 km/h: Sehr gute, dynamische Bedingungen (Idealbereich)
+- > 30 km/h: Warnbereich, wird schnell anspruchsvoll/gefährlich (böig, Lee-Gefahr)
+
 - Gib WINDRICHTUNGS-RANGE an (z.B. "220-270°"), NICHT nur Start/Ende
 - Bewerte KONSISTENZ: Konstante Richtung = GUT, häufige Wechsel = SCHLECHT
-- 2-STUNDEN-REGEL: Wind muss nicht durchgehend passen, 2h aus guter Richtung reichen für Start
 - VOLATILITÄT: Abrupte Wechsel schlechter als graduelle Änderungen
-- BÖEN-WARNUNG: >30 km/h = VORSICHT, >40 km/h = GEFÄHRLICH (wichtiger als Windstärke!)
 
-WICHTIG WOLKEN-ANALYSE (Uetliberg 730m MSL):
-- Wolkenbasis "wolkenfrei" = KEINE WOLKEN vorhanden (= SEHR GUT, unbegrenzter Thermikraum)
-- LOW CLOUDS (0-2km MSL): ENTSCHEIDEND für Flugbarkeit
-  * Wolkenbasis <1000m = START UNMÖGLICH (Nebel/niedrige Wolken)
-  * Wolkenbasis 1000-2000m = FLIEGBAR
-  * Wolkenbasis >2000m = SEHR GUT (viel Thermikraum)
-- MID CLOUDS (2-6km MSL): Wetterstabilität-Indikator, wenig Einfluss auf Start
-- HIGH CLOUDS (>6km MSL): Wetterwechsel-Hinweis, schwächere Thermik möglich
+═══════════════════════════════════════════════
+WOLKEN-ANALYSE (Uetliberg 730m MSL)
+═══════════════════════════════════════════════
 
-OPTIMALE BEWÖLKUNG:
-- Cumulus humilis (kleine Haufenwolken) + Blau dazwischen = FLIEGBAR
-- Wolkenbasis ideal: >1500-2000m AGL
+Es gibt ZWEI verschiedene "Wolkenhöhen" in den Daten — sie messen verschiedene Dinge!
 
-KRITISCHE BEWÖLKUNG:
-- Cumulonimbus (Türme, dunkle Basis) = LANDEN (Gewitter/Böen)
-- Geschlossener Stratus = KEINE THERMIK
-- Dichte Cirren = SCHWACHE THERMIK
+1. "Wolkenbasis" in den Stundendaten (Open-Meteo cloud_base) = REALE meteorologische Wolkenuntergrenze:
+   - SICHERHEITSRELEVANT (Stufe 1)!
+   - "wolkenfrei" = keine Wolken vorhanden = SEHR GUT
+   - <1000m MSL = STARTVERBOT (Nebel/Stratus am Hang)
+   - 1000-2000m MSL = FLIEGBAR
+   - >2000m MSL = SEHR GUT
 
-WICHTIG HÖHENWIND-ANALYSE:
-- WIND-SCHERUNG: Große Geschwindigkeits-/Richtungsunterschiede zwischen Höhen = GEFÄHRLICH
-  * >10 km/h Unterschied pro 500m = VORSICHT
-  * >90° Richtungsänderung = TURBULENZ-RISIKO
-- THERMISCHE INVERSION: Temperaturanstieg mit Höhe = STABILE LUFTSCHICHTUNG
-  * Begrenzt Thermikentwicklung
-  * Typischerweise schlechte Thermikbedingungen
-- OPTIMAL: Gleichmäßiges Windprofil (Geschwindigkeit steigt sanft, Richtung konstant)
-- HÖHENWINDE: Starke Winde in der Höhe können auf Lee-Rotor oder Föhn hinweisen
+2. "LCL/Basis" und "bis X m MSL" im THERMIK-PROXY = BERECHNETE thermische Wolkenbasis:
+   - QUALITÄTSRELEVANT (Stufe 2)!
+   - LCL = Höhe, wo aufsteigende Thermik kondensiert (Cu-Basis)
+   - max_height = Nutzbare Arbeitshöhe (Inversion/Sperrschicht)
+   - Wenn max_height > LCL → Piloten stossen an die Wolke
 
-WICHTIG THERMIK-MODELL (THERMIK-PROXY):
+- LOW CLOUDS (0-2km MSL): ENTSCHEIDEND für Startbarkeit
+- MID CLOUDS (2-6km MSL): Wetterstabilität-Indikator
+- HIGH CLOUDS (>6km MSL): Wetterwechsel-Hinweis
+
+═══════════════════════════════════════════════
+THERMIK-PROXY-MODELL
+═══════════════════════════════════════════════
+
 - In den Daten ist ein physikalisches Thermik-Proxy-Modell enthalten. Beziehe dich bei der Thermik-Bewertung primär auf diese Werte!
-- "m/s" = Erwartetes Steigen (w* Variante). <1.0 = schwach, 1-2 = gut abends/mittags, >2.5 = stark (sportlich)
-- "bis X m MSL" = Das ist die exakt berechnete nutzbare Arbeitshöhe der Thermik (Inversion oder Limit), bewerte das für Streckenflugpotenzial.
-- "LCL/Basis = X m" = Das ist das errechnete Kondensationsniveau. Wenn Arbeitshöhe > Basis, dann stoßen Piloten an die Wolke.
-- Das Güte-Rating (0-10) gibt einen klaren Anhaltspunkt für die Stärke der Thermik in diesem Zeitfenster.
+- "m/s" = Erwartetes Steigen (w* Variante)
+- "bis X m MSL" = Nutzbare Arbeitshöhe der Thermik
+- "LCL/Basis = X m" = Kondensationsniveau
+- Das Güte-Rating (0-10) gibt einen Anhaltspunkt für die Thermik-Stärke
 
-Bewerte nach folgenden Kriterien:
-1. Wind (RANGE in Grad, Konsistenz, Volatilität, Böen-Gefahr, 2h-Fenster)
-2. Thermik-Potenzial (NUTZE DIE THERMIK-PROXY WERTE, CAPE, Sonnenschein)
-3. Wolkenbasis (MSL-Höhe, LCL, kritische Schwellen für Uetliberg)
-4. Niederschlag und Sicht
-5. Luftraum-Einschränkungen
-6. Wetterentwicklung (nächste 3-6h)
-7. Lokale Gefahren
+WICHTIG: Die THERMIK-PROXY-Daten sind in JEDER Stunde enthalten (Format: "THERMIK-PROXY: X.X m/s bis XXXXm MSL").
+Du MUSST diese Werte im details.thermik Feld IMMER zitieren und analysieren! Schreibe NIE "keine Thermikdaten verfügbar" wenn THERMIK-PROXY-Werte in den Stundendaten vorhanden sind.
 
-WICHTIG: Sicherheit hat höchste Priorität - bei Zweifel: Nicht fliegbar!
-Antworte ausschliesslich mit gültigem JSON.
+═══════════════════════════════════════════════
+HÖHENWIND-ANALYSE
+═══════════════════════════════════════════════
 
-WICHTIG: Gib IMMER konkrete Metriken/Zahlenwerte an wenn du diese in den Analysen erwähnst!
+- WIND-SCHERUNG: >10 km/h Unterschied pro 500m = VORSICHT, >90° Richtungsänderung = TURBULENZ
+- THERMISCHE INVERSION: Temperaturanstieg mit Höhe = stabile Luftschichtung
+- Starke Höhenwinde können auf Lee-Rotor oder Föhn hinweisen
 
-WICHTIG STÜNDLICHE BEWERTUNGEN:
-- Du MUSST für JEDE einzelne Stunde eine separate Bewertung abgeben
-- Bewerte jede Stunde einzeln basierend auf den Wetterdaten dieser Stunde
-- Gib für jede Stunde: conditions (EXCELLENT/GOOD/MODERATE/POOR/DANGEROUS), flyable (true/false), rating (1-10), reason (kurze Begründung)
-- Zusätzlich gibst du ein Gesamt-Fazit für den ganzen Tag
+Sicherheit hat IMMER höchste Priorität — bei Zweifel: flyable: false!
+Gib IMMER konkrete Metriken/Zahlenwerte an (Wind in km/h & Grad, CAPE in J/kg, Wolkenbasis in m MSL).
 
-Antworte IMMER mit folgendem JSON-Format (keine zusätzlichen Erklärungen):
+Antworte ausschliesslich mit gültigem JSON im folgenden Format:
 {
+  "day_summary": "Kompaktes Fazit zum Tag (Fokus: Highlight & Hauptgefahr).",
   "flyable": true/false,
   "rating": 1-10,
-  "confidence": 1-10,
-  "conditions": "EXCELLENT/GOOD/MODERATE/POOR/DANGEROUS",
-  "summary": "Gesamt-Zusammenfassung für den ganzen Tag (1-2 Sätze)",
+  "golden_window": "HH:MM-HH:MM oder null wenn kein gutes Fenster",
   "details": {
-    "wind": "AUSFÜHRLICHE Wind-Analyse mit konkreten Metriken: Windrichtung in Grad, Windgeschwindigkeit in km/h, Böen in km/h, Bewertung",
-    "thermik": "AUSFÜHRLICHE Thermik-Einschätzung mit konkreten Metriken: CAPE-Wert in J/kg, Sonnenscheindauer in Stunden, Bewölkung in %, Temperatur in °C",
-    "risks": "AUSFÜHRLICHE Risiko-Analyse mit konkreten Metriken: Wolkenbasis in m, Bewölkung in %, Niederschlag in mm, Temperatur in °C, alle relevanten Zahlenwerte"
+    "wind": "Ausführliche Wind-Analyse mit Metriken",
+    "thermik": "Ausführliche Thermik-Analyse: IMMER die THERMIK-PROXY-Werte (m/s, Arbeitshöhe, Rating) aus den Stundendaten zitieren und bewerten! Nie 'keine Daten' schreiben wenn THERMIK-PROXY vorhanden ist.",
+    "risks": "Ausführliche Risiko-Analyse mit Metriken"
   },
   "recommendation": "Konkrete Empfehlung für Piloten",
-  "hourly_evaluations": [
+  "sectors": [
     {
-      "hour": 9,
-      "timestamp": "2026-01-04T09:00:00Z",
-      "conditions": "EXCELLENT/GOOD/MODERATE/POOR/DANGEROUS",
+      "slot": "HH:MM-HH:MM",
+      "safety": "SAFE/CAUTION/DANGEROUS",
       "flyable": true/false,
       "rating": 1-10,
-      "reason": "Kurze Begründung für diese spezifische Stunde (z.B. 'Wind 15 km/h aus optimaler Richtung, gute Thermik erwartet')"
-    },
-    {
-      "hour": 10,
-      "timestamp": "2026-01-04T10:00:00Z",
-      "conditions": "EXCELLENT/GOOD/MODERATE/POOR/DANGEROUS",
-      "flyable": true/false,
-      "rating": 1-10,
-      "reason": "Kurze Begründung"
+      "wind_info": "Richtungs-Range, Böen-Check",
+      "reason": "Max 150 Zeichen: Erst Sicherheit, dann Thermik-Qualität."
     }
-    // ... für jede Stunde im Flugstunden-Zeitraum
   ]
 }"""
 
 # User-Prompt Template (mit Platzhaltern für dynamische Werte)
-# Platzhalter: {name}, {fluggebiet}, {typ}, {windrichtung}, {besonderheiten}, 
-#              {hourly_data}, {wind_check_info}, {total_hours}, {flight_hours_start}, {flight_hours_end}
+# Platzhalter: {name}, {fluggebiet}, {typ}, {windrichtung}, {besonderheiten},
+#              {hourly_data}, {total_hours}, {flight_hours_start}, {flight_hours_end}, {foehn_info}
 LLM_USER_PROMPT_TEMPLATE = """Analysiere die Flugbarkeit für folgenden Startplatz:
 
 STARTPLATZ-INFO:
@@ -277,41 +403,18 @@ WICHTIG - WINDRICHTUNGS-INTERPRETATION:
   * "N-NO" = 0° bis 45°
 Besonderheiten: {besonderheiten}
 
-AKTUELLE WETTERDATEN (erste 6 Stunden):
+AKTUELLE WETTERDATEN ({total_hours} Stunden im Zeitraum {flight_hours_start}:00-{flight_hours_end}:00):
 {hourly_data}
-
-WETTERENTWICKLUNG:
-Es stehen {total_hours} Stunden Forecast-Daten zur Verfügung. Fokussiere auf die nächsten 3-6 Stunden für die Flugbarkeits-Entscheidung.
-
-WICHTIG: STÜNDLICHE BEWERTUNGEN ERFORDERLICH:
-- Du MUSST für JEDE einzelne Stunde im Flugstunden-Zeitraum ({flight_hours_start}:00-{flight_hours_end}:00) eine separate Bewertung abgeben
-- Bewerte jede Stunde einzeln basierend auf den Wetterdaten dieser spezifischen Stunde
-- Für jede Stunde gib an: conditions (EXCELLENT/GOOD/MODERATE/POOR/DANGEROUS), flyable (true/false), rating (1-10), reason (kurze Begründung)
-- Zusätzlich gibst du ein Gesamt-Fazit für den ganzen Tag (summary, details, recommendation)
+{foehn_info}
+SEKTOR-ANALYSE ERFORDERLICH:
+- Fasse Stunden mit ähnlicher Wetterlage zu Sektoren zusammen (z.B. "09:00-12:00", "12:00-15:00")
+- Für jeden Sektor: safety (SAFE/CAUTION/DANGEROUS), flyable (true/false), rating (1-10), wind_info, reason
+- Wende die ANALYSE-KASKADE an: Erst Sicherheit prüfen, dann Qualität bewerten
+- Zusätzlich: day_summary, golden_window (bestes 2h-Fenster), details (wind, thermik, risks), recommendation
 
 WICHTIG FÜR DIE ANALYSE:
-- WIND-RICHTUNG: Gib IMMER eine Range an (z.B. "Windrichtung dreht zwischen 220° und 270°")
-  * Bewerte Konsistenz: "Wind konstant aus 280-290°" = GUT vs. "Wind dreht wild in alle Richtungen" = SCHLECHT
-  * 2h-Regel: "Wind für 2 Stunden aus guter Richtung 270-290°, dann Drehung" → Bewerten ob Start möglich
-  * Volatilität: Abrupte Wechsel vs. graduelle Änderungen analysieren
-- BÖEN: KRITISCHE SCHWELLEN beachten!
-  * >30 km/h = VORSICHT (in Analyse erwähnen)
-  * >40 km/h = GEFÄHRLICH (macht gute Windstärke zunichte!)
-- WOLKENBASIS (Uetliberg 730m MSL):
-  * <900m MSL = START UNMÖGLICH
-  * 900-2000m MSL = FLIEGBAR  
-  * >2000m MSL = SEHR GUT
-- CLOUD COVER LAYERS analysieren:
-  * Low (0-2km): Entscheidend für Thermik am Start
-  * Mid (2-6km): Wetterstabilität
-  * High (>6km): Wetterwechsel/schwächere Thermik
-- Gib IMMER konkrete Metriken/Zahlenwerte an wenn du diese erwähnst:
-  * Wind: Windrichtung in Grad (z.B. "294°"), Windgeschwindigkeit in km/h (z.B. "20.5 km/h"), Böen in km/h (z.B. "44.6 km/h")
-  * Thermik: CAPE-Wert in J/kg (z.B. "150 J/kg"), Sonnenscheindauer in Stunden (z.B. "0 Stunden"), Bewölkung in % (z.B. "100%"), Temperatur in °C (z.B. "-2.6°C")
-  * Risiken: Wolkenbasis in m (z.B. "700-760m"), Bewölkung in % (z.B. "100%"), Niederschlag in mm (z.B. "0.7mm"), Temperatur in °C (z.B. "-2.6°C")
-- Beispiel für Wind-Analyse: "Wind kommt aus 294° (NW), Windgeschwindigkeit 20.5 km/h mit Böen bis 44.6 km/h..."
-- Beispiel für Thermik-Analyse: "CAPE-Wert ist 0.0 J/kg, Sonnenscheindauer 0 Stunden, Bewölkung 100%..."
-- Beispiel für Risiken: "Wolkenbasis ist mit 700-760m sehr niedrig, Bewölkung nahezu 100%, Temperatur -2.6°C..."
+- Gib IMMER konkrete Metriken/Zahlenwerte an (Wind in km/h & Grad, CAPE in J/kg, Wolkenbasis in m MSL)
+- Bei flyable: false → reason MUSS zuerst das Sicherheitsrisiko nennen
 
 Antworte mit dem geforderten JSON-Format."""
 
