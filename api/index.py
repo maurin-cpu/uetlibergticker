@@ -10,5 +10,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Importiere Flask-App aus web.py
-# Vercel erwartet eine Variable namens 'app' bei Flask-Framework
-from web import app
+# Explicit assignment required for Vercel's Python AST parser
+from web import app as flask_app
+app = flask_app
