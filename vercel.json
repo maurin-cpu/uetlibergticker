@@ -1,17 +1,13 @@
 {
-  "builds": [
-    {
-      "src": "web.py",
-      "use": "@vercel/python",
-      "config": {
-        "maxDuration": 60
-      }
+  "functions": {
+    "api/*.py": {
+      "maxDuration": 60
     }
-  ],
+  },
   "rewrites": [
     {
       "source": "/(.*)",
-      "destination": "/web.py"
+      "destination": "/api/index"
     }
   ],
   "crons": [
