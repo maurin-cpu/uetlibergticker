@@ -2,9 +2,9 @@
     "name": "uetliberg-ticker",
     "version": "1.0.0",
     "description": "Wetterdaten für Gleitschirmflug-Standorte",
-    "main": "api/index.py",
+    "main": "web.py",
     "scripts": {
-        "dev": "concurrently \"python api/index.py\" \"mkdocs serve\"",
+        "dev": "concurrently \"python web.py\" \"mkdocs serve\"",
         "fetch": "python fetch_weather.py",
         "evaluate": "python location_evaluator.py",
         "test": "python test_email_connection.py"

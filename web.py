@@ -6,14 +6,9 @@ Flask-basiertes Interface mit D3.js Visualisierung und LLM-Auswertung
 
 import json
 import os
-import sys
 from datetime import datetime
 from pathlib import Path
 from flask import Flask, render_template, jsonify, request, send_file
-
-# Projekt-Root zum Python-Pfad hinzufuegen (da Datei nun in api/ liegt)
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
 import config
 from thermik_calculator import calculate_thermal_profile, calculate_dewpoint
 from config import (
@@ -83,12 +78,14 @@ CACHED_WEATHER_DATA = None
 LAST_FETCH_TIME = 0
 CACHE_DURATION = 300  # 5 Minuten Cache
 
-# Stelle sicher, dass Flask das templates- und static-Verzeichnis findet
-root_dir = Path(__file__).parent.parent
-template_dir = root_dir / 'templates'
-static_dir = root_dir / 'static'
+# Stelle sicher, dass Flask das templates-Verzeichnis findet
+# Für Vercel: Verwende absoluten Pfad zum Projekt-Root
+template_dir = Path(__file__).parent / 'templates'
+if not template_dir.exists():
+    # Fallback: Falls templates/ nicht existiert, verwende aktuelles Verzeichnis
+    template_dir = Path(__file__).parent
 
-app = Flask(__name__, template_folder=str(template_dir), static_folder=str(static_dir))
+app = Flask(__name__, template_folder=str(template_dir))
 
 
 def load_weather_data():
@@ -1406,7 +1403,7 @@ def unsubscribe(token):
 
 if __name__ == '__main__':
     # Prüfe ob Wetterdaten vorhanden sind
-    weather_file = root_dir / "data" / "wetterdaten.json"
+    weather_file = Path("data/wetterdaten.json")
     if not weather_file.exists():
         print("[WARNUNG] data/wetterdaten.json nicht gefunden!")
         print("   Bitte zuerst 'python fetch_weather.py' ausführen.")

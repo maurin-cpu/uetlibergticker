@@ -24,7 +24,8 @@
       "WebFetch(domain:open-meteo.com)",
       "WebFetch(domain:api.open-meteo.com)",
       "WebFetch(domain:archive-api.open-meteo.com)",
-      "WebFetch(domain:github.com)"
+      "WebFetch(domain:github.com)",
+      "Bash(git:*)"
     ]
   }
 }
