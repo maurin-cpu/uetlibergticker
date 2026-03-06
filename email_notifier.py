@@ -32,7 +32,7 @@ class EmailNotifier:
         self.sender = os.environ.get('EMAIL_SENDER')
         self.password = os.environ.get('EMAIL_PASSWORD')
         self.recipient = os.environ.get('EMAIL_RECIPIENT')
-        self.base_url = os.environ.get('APP_BASE_URL', 'https://uetliberg-ticker.vercel.app')
+        self.base_url = os.environ.get('APP_BASE_URL', 'https://uetlibergticker-eta.vercel.app')
 
         self.enabled = all([self.smtp_server, self.sender, self.password, self.recipient])
 
